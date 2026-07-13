@@ -175,6 +175,7 @@
     <header class="appbar">
       <div class="info">
         <span class="city" id="hdrCiudad">Ciudad</span>
+        <span class="mail" id="hdrNombre">Nombre</span>
         <span class="mail" id="hdrCorreo">correo@ejemplo.com</span>
       </div>
       <div class="actions">
@@ -279,7 +280,7 @@
  *  CONFIGURACIÓN — pega aquí la URL de tu Web App de Apps Script
  *  (termina en /exec). La obtienes al implementar Code.gs.
  * ==================================================================== */
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbx92vii3_UHY5h-aqfghsDnOMvEiFs9cP0h3KSp3XSEb8iqHUlhkEdbVWtqPh6w3M98/exec';
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwir0TXiNO66lbX_SG06yR0uvMLmLhlbY8K3wVvcSJCd2rMVGOohQBpb0434SpRwuBl7g/exec';
 
 /* ======================================================================
  *  ESTADO
@@ -406,6 +407,7 @@ document.getElementById('btnChangeCity').addEventListener('click', () => {
  * ==================================================================== */
 function startApp() {
   document.getElementById('hdrCiudad').textContent = session.ciudad;
+  document.getElementById('hdrNombre').textContent = session.nombre || '';
   document.getElementById('hdrCorreo').textContent = session.correo;
   document.getElementById('tabbar').style.display = 'flex';
   refreshCurrentView();
@@ -478,7 +480,7 @@ async function refreshCurrentView(silent) {
  * ==================================================================== */
 async function loadRemisiones() {
   const cont = document.getElementById('remisionesList');
-  const res = await apiCall('getRemisiones', { distribuidorId: session.id, ciudad: session.ciudad, soloPendientes: true });
+  const res = await apiCall('getRemisiones', { distribuidorId: session.id, nombre: session.nombre, ciudad: session.ciudad, soloPendientes: true });
   cont.innerHTML = '';
   if (!res.remisiones.length) {
     cont.innerHTML = '<div class="empty-state">🎉 No hay remisiones pendientes</div>';
@@ -562,7 +564,7 @@ document.getElementById('btnGuardarRemision').addEventListener('click', async ()
  *  VISTA CONSIGNAR
  * ==================================================================== */
 async function loadConsignarView() {
-  const res = await apiCall('getPendientes', { distribuidorId: session.id, ciudad: session.ciudad });
+  const res = await apiCall('getPendientes', { distribuidorId: session.id, nombre: session.nombre, ciudad: session.ciudad });
   pendConsignacionesCache = res.consignacionesPendientes;
   const cont = document.getElementById('checklistRemisiones');
   cont.innerHTML = '';
@@ -580,7 +582,7 @@ async function loadConsignarView() {
 }
 
 async function loadConsignacionesHistorial() {
-  const res = await apiCall('getConsignaciones', { distribuidorId: session.id, ciudad: session.ciudad });
+  const res = await apiCall('getConsignaciones', { distribuidorId: session.id, nombre: session.nombre, ciudad: session.ciudad });
   const cont = document.getElementById('consignacionesList');
   cont.innerHTML = '';
   if (!res.consignaciones.length) {
@@ -624,6 +626,7 @@ document.getElementById('btnEnviarConsignacion').addEventListener('click', async
   try {
     await apiCall('addConsignacion', {
       distribuidorId: session.id,
+      nombre: session.nombre,
       ciudad: session.ciudad,
       fechas: fechas,
       valorConsignado: Number(valor),
@@ -651,7 +654,7 @@ document.getElementById('btnEnviarConsignacion').addEventListener('click', async
  *  VISTA STOCK
  * ==================================================================== */
 async function loadStock() {
-  const res = await apiCall('getStock', { distribuidorId: session.id, ciudad: session.ciudad });
+  const res = await apiCall('getStock', { distribuidorId: session.id, nombre: session.nombre, ciudad: session.ciudad });
   const cont = document.getElementById('stockCard');
   cont.innerHTML = '';
   if (!res.stock.length) {
@@ -676,7 +679,7 @@ async function loadStock() {
  *  VISTA PENDIENTES
  * ==================================================================== */
 async function loadPendientes() {
-  const res = await apiCall('getPendientes', { distribuidorId: session.id, ciudad: session.ciudad });
+  const res = await apiCall('getPendientes', { distribuidorId: session.id, nombre: session.nombre, ciudad: session.ciudad });
 
   const contE = document.getElementById('pendEntregas');
   contE.innerHTML = '';
@@ -750,3 +753,4 @@ if ('serviceWorker' in navigator) {
 </script>
 </body>
 </html>
+
