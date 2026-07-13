@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>App Distribuidores</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1e6b52">
+<style>
+  :root{
+    --primary:#1e6b52;
+    --primary-dark:#154b3a;
+    --bg:#f4f6f5;
+    --card:#ffffff;
+    --text:#1c2a26;
+    --muted:#6b7a75;
+    --danger:#c0392b;
+    --warning:#c98a12;
+    --ok:#1e6b52;
+    --border:#e1e6e4;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--text);
+    -webkit-tap-highlight-color:transparent;
+  }
+  #app{max-width:520px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);}
+  .screen{display:none;flex-direction:column;flex:1;padding-bottom:78px;}
+  .screen.active{display:flex;}
+
+  /* ---- Login ---- */
+  #login-screen{justify-content:center;align-items:center;padding:24px;min-height:100vh;}
+  .login-box{width:100%;max-width:360px;background:var(--card);border-radius:20px;padding:32px 24px;box-shadow:0 8px 30px rgba(0,0,0,.08);}
+  .login-box h1{font-size:22px;margin:0 0 4px;color:var(--primary-dark);}
+  .login-box p.sub{color:var(--muted);margin:0 0 24px;font-size:14px;}
+  label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:14px 0 6px;}
+  input[type=text],input[type=email],input[type=password],input[type=date],input[type=number],textarea,select{
+    width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:10px;font-size:15px;background:#fff;color:var(--text);
+  }
+  textarea{resize:vertical;min-height:70px;font-family:inherit;}
+  button.primary{
+    width:100%;padding:14px;background:var(--primary);color:#fff;border:none;border-radius:10px;
+    font-size:15px;font-weight:700;margin-top:20px;cursor:pointer;
+  }
+  button.primary:active{background:var(--primary-dark);}
+  button.secondary{
+    width:100%;padding:12px;background:#fff;color:var(--primary);border:1.5px solid var(--primary);border-radius:10px;
+    font-size:14px;font-weight:600;margin-top:10px;cursor:pointer;
+  }
+  .error-msg{color:var(--danger);font-size:13px;margin-top:10px;display:none;}
+  .success-msg{color:var(--ok);font-size:13px;margin-top:10px;display:none;}
+
+  /* ---- Header app ---- */
+  header.appbar{
+    background:var(--primary);color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;
+    position:sticky;top:0;z-index:10;
+  }
+  header.appbar .info{display:flex;flex-direction:column;}
+  header.appbar .info .city{font-weight:700;font-size:15px;}
+  header.appbar .info .mail{font-size:11px;opacity:.85;}
+  header.appbar .actions{display:flex;gap:8px;align-items:center;}
+  header.appbar button.icon-btn{
+    background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:8px;padding:8px 10px;font-size:13px;cursor:pointer;
+  }
+
+  .refresh-bar{
+    display:flex;align-items:center;gap:8px;padding:10px 16px;background:#eef3f1;border-bottom:1px solid var(--border);
+    font-size:12px;color:var(--muted);
+  }
+  .refresh-bar select{width:auto;padding:6px 8px;font-size:12px;border-radius:8px;}
+  .refresh-bar .refresh-btn{
+    margin-left:auto;background:var(--primary);color:#fff;border:none;border-radius:8px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;
+  }
+  .refresh-bar .dot{width:7px;height:7px;border-radius:50%;background:#9aa;display:inline-block;}
+  .refresh-bar .dot.live{background:#2ecc71;}
+
+  /* ---- Contenido ---- */
+  main{padding:14px 16px;flex:1;}
+  .card{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.05);border:1px solid var(--border);}
+  .card .row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;}
+  .card .row strong{font-size:15px;}
+  .card .muted{color:var(--muted);font-size:12.5px;}
+  .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;}
+  .badge.pendiente{background:#fde9c8;color:var(--warning);}
+  .badge.entregado{background:#d7f0e5;color:var(--ok);}
+  .badge.caido{background:#f8d7d2;color:var(--danger);}
+  .badge.reprogramado{background:#dbe6fb;color:#2a5bd7;}
+  .empty-state{text-align:center;color:var(--muted);padding:40px 16px;font-size:14px;}
+  .section-title{font-size:13px;font-weight:700;text-transform:uppercase;color:var(--muted);margin:18px 0 8px;letter-spacing:.03em;}
+
+  /* ---- Tabs inferiores ---- */
+  nav.tabbar{
+    position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--border);
+    display:flex;max-width:520px;margin:0 auto;z-index:20;padding-bottom:env(safe-area-inset-bottom);
+  }
+  nav.tabbar button{
+    flex:1;background:none;border:none;padding:10px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:3px;
+    color:var(--muted);font-size:10.5px;cursor:pointer;font-weight:600;
+  }
+  nav.tabbar button .ic{font-size:19px;}
+  nav.tabbar button.active{color:var(--primary);}
+
+  /* ---- Modal ---- */
+  .modal-overlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:flex-end;justify-content:center;z-index:100;
+  }
+  .modal-overlay.active{display:flex;}
+  .modal{
+    background:#fff;width:100%;max-width:520px;border-radius:20px 20px 0 0;padding:20px;max-height:88vh;overflow-y:auto;
+  }
+  .modal h2{margin:0 0 4px;font-size:17px;}
+  .modal .close-x{position:absolute;right:20px;top:18px;background:none;border:none;font-size:20px;color:var(--muted);cursor:pointer;}
+  .modal-header{display:flex;justify-content:space-between;align-items:center;position:relative;margin-bottom:6px;}
+  .chip-select{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;}
+  .chip{padding:9px 14px;border-radius:20px;border:1.5px solid var(--border);font-size:13px;font-weight:600;cursor:pointer;color:var(--muted);}
+  .chip.sel-entregado.active{background:var(--ok);border-color:var(--ok);color:#fff;}
+  .chip.sel-caido.active{background:var(--danger);border-color:var(--danger);color:#fff;}
+  .chip.sel-reprogramado.active{background:#2a5bd7;border-color:#2a5bd7;color:#fff;}
+  .file-drop{
+    border:1.5px dashed var(--border);border-radius:12px;padding:16px;text-align:center;color:var(--muted);font-size:13px;
+    cursor:pointer;margin-top:6px;
+  }
+  .file-drop img{max-width:100%;border-radius:10px;margin-top:8px;}
+  .checklist{display:flex;flex-direction:column;gap:8px;margin-top:6px;}
+  .checklist label{display:flex;align-items:center;gap:10px;font-weight:500;font-size:13.5px;color:var(--text);margin:0;
+    border:1px solid var(--border);border-radius:10px;padding:10px 12px;}
+  .checklist input{width:auto;}
+  .toast{
+    position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#1c2a26;color:#fff;padding:10px 18px;
+    border-radius:30px;font-size:13px;z-index:200;display:none;box-shadow:0 4px 16px rgba(0,0,0,.2);
+  }
+  .spinner{
+    width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;
+    display:inline-block;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .city-btn{width:100%;padding:16px;margin-bottom:10px;border-radius:12px;border:1.5px solid var(--border);background:#fff;
+    font-size:15px;font-weight:600;text-align:left;cursor:pointer;color:var(--text);}
+  .city-btn:active{border-color:var(--primary);}
+  .stock-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border);}
+  .stock-row:last-child{border-bottom:none;}
+  .stock-num{font-weight:700;font-size:15px;}
+  .stock-num.neg{color:var(--danger);}
+  .total-box{background:#eef3f1;border-radius:12px;padding:14px;margin-top:12px;display:flex;justify-content:space-between;font-weight:700;}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ===================== LOGIN ===================== -->
+  <section id="login-screen" class="screen active">
+    <div class="login-box">
+      <h1>Distribuidores</h1>
+      <p class="sub">Ingresa con tu correo y contraseña</p>
+      <label>Correo</label>
+      <input type="email" id="loginCorreo" placeholder="correo@ejemplo.com" autocomplete="username">
+      <label>Contraseña</label>
+      <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password">
+      <button class="primary" id="btnLogin">Ingresar</button>
+      <p class="error-msg" id="loginError"></p>
+    </div>
+  </section>
+
+  <!-- ===================== SELECCIÓN DE CIUDAD ===================== -->
+  <section id="city-screen" class="screen" style="padding:24px;">
+    <h1 style="font-size:20px;color:var(--primary-dark);">Selecciona tu ciudad</h1>
+    <p class="sub" style="color:var(--muted);margin-bottom:20px;">Tienes varias ciudades a cargo</p>
+    <div id="cityList"></div>
+  </section>
+
+  <!-- ===================== APP PRINCIPAL ===================== -->
+  <section id="main-screen" class="screen">
+    <header class="appbar">
+      <div class="info">
+        <span class="city" id="hdrCiudad">Ciudad</span>
+        <span class="mail" id="hdrCorreo">correo@ejemplo.com</span>
+      </div>
+      <div class="actions">
+        <button class="icon-btn" id="btnChangeCity" title="Cambiar ciudad">🏙️</button>
+        <button class="icon-btn" id="btnLogout" title="Salir">Salir</button>
+      </div>
+    </header>
+
+    <div class="refresh-bar">
+      <span class="dot" id="autoDot"></span>
+      <span id="autoLabel">Auto: 1 min</span>
+      <select id="intervalSelect">
+        <option value="0">Manual</option>
+        <option value="30000">30 seg</option>
+        <option value="60000" selected>1 min</option>
+        <option value="300000">5 min</option>
+      </select>
+      <button class="refresh-btn" id="btnRefresh">↻ Actualizar</button>
+    </div>
+
+    <main id="viewRemisiones" class="view">
+      <div class="section-title">Remisiones pendientes</div>
+      <div id="remisionesList"></div>
+    </main>
+
+    <main id="viewConsignar" class="view" style="display:none;">
+      <div class="section-title">Reportar consignación</div>
+      <label>Remisiones que incluye esta consignación</label>
+      <div class="checklist" id="checklistRemisiones"></div>
+      <label>Fecha(s) de entrega que consigna</label>
+      <input type="text" id="consFechas" placeholder="Ej: 10/07, 11/07/2026">
+      <label>Valor consignado</label>
+      <input type="number" id="consValor" placeholder="0">
+      <label>Comprobante (foto)</label>
+      <div class="file-drop" id="consFotoDrop">📷 Toca para tomar/adjuntar foto</div>
+      <input type="file" id="consFotoInput" accept="image/*" capture="environment" style="display:none;">
+      <label>Observaciones</label>
+      <textarea id="consObs" placeholder="Notas adicionales..."></textarea>
+      <button class="primary" id="btnEnviarConsignacion">Enviar consignación</button>
+      <p class="success-msg" id="consMsg"></p>
+
+      <div class="section-title">Historial de consignaciones</div>
+      <div id="consignacionesList"></div>
+    </main>
+
+    <main id="viewStock" class="view" style="display:none;">
+      <div class="section-title">Stock disponible</div>
+      <div class="card" id="stockCard"></div>
+    </main>
+
+    <main id="viewPendientes" class="view" style="display:none;">
+      <div class="section-title">Entregas pendientes</div>
+      <div id="pendEntregas"></div>
+      <div class="section-title">Consignaciones pendientes</div>
+      <div id="pendConsignaciones"></div>
+    </main>
+  </section>
+
+  <nav class="tabbar" id="tabbar" style="display:none;">
+    <button data-view="viewRemisiones" class="tab active"><span class="ic">📦</span>Remisiones</button>
+    <button data-view="viewConsignar" class="tab"><span class="ic">💵</span>Consignar</button>
+    <button data-view="viewStock" class="tab"><span class="ic">📊</span>Stock</button>
+    <button data-view="viewPendientes" class="tab"><span class="ic">⏳</span>Pendientes</button>
+  </nav>
+</div>
+
+<!-- ===================== MODAL DETALLE REMISIÓN ===================== -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalTitle">Remisión</h2>
+      <button class="close-x" id="modalClose">✕</button>
+    </div>
+    <p class="muted" id="modalSub"></p>
+
+    <label>Estado</label>
+    <div class="chip-select">
+      <div class="chip sel-entregado" data-estado="Entregado">Entregado</div>
+      <div class="chip sel-caido" data-estado="Caído">Caído</div>
+      <div class="chip sel-reprogramado" data-estado="Reprogramado">Reprogramado</div>
+    </div>
+
+    <label>Fecha de entrega</label>
+    <input type="date" id="modalFecha">
+
+    <label>Observación</label>
+    <textarea id="modalObs" placeholder="Escribe una observación..."></textarea>
+
+    <label>Foto (opcional)</label>
+    <div class="file-drop" id="modalFotoDrop">📷 Toca para tomar/adjuntar foto</div>
+    <input type="file" id="modalFotoInput" accept="image/*" capture="environment" style="display:none;">
+
+    <button class="primary" id="btnGuardarRemision">Guardar</button>
+    <p class="error-msg" id="modalError"></p>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ======================================================================
+ *  CONFIGURACIÓN — pega aquí la URL de tu Web App de Apps Script
+ *  (termina en /exec). La obtienes al implementar Code.gs.
+ * ==================================================================== */
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbx92vii3_UHY5h-aqfghsDnOMvEiFs9cP0h3KSp3XSEb8iqHUlhkEdbVWtqPh6w3M98/exec';
+
+/* ======================================================================
+ *  ESTADO
+ * ==================================================================== */
+let session = JSON.parse(localStorage.getItem('distribuidor_session') || 'null');
+let currentView = 'viewRemisiones';
+let autoTimer = null;
+let selectedRemision = null; // remision abierta en el modal
+let modalFotoBase64 = null;
+let consFotoBase64 = null;
+let pendConsignacionesCache = [];
+
+/* ======================================================================
+ *  API
+ * ==================================================================== */
+async function apiCall(action, data) {
+  const res = await fetch(WEB_APP_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action, data })
+  });
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || 'Error desconocido');
+  return json;
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 2500);
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+/* ======================================================================
+ *  LOGIN
+ * ==================================================================== */
+document.getElementById('btnLogin').addEventListener('click', async () => {
+  const correo = document.getElementById('loginCorreo').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  const errEl = document.getElementById('loginError');
+  errEl.style.display = 'none';
+  if (!correo || !pass) { errEl.textContent = 'Completa correo y contraseña'; errEl.style.display = 'block'; return; }
+
+  const btn = document.getElementById('btnLogin');
+  btn.innerHTML = '<span class="spinner"></span>Ingresando...';
+  try {
+    const res = await apiCall('login', { correo, password: pass });
+    session = res.distribuidor;
+    localStorage.setItem('distribuidor_session', JSON.stringify(session));
+    goAfterLogin();
+  } catch (e) {
+    errEl.textContent = e.message;
+    errEl.style.display = 'block';
+  } finally {
+    btn.innerHTML = 'Ingresar';
+  }
+});
+
+function goAfterLogin() {
+  if (!session.ciudades || session.ciudades.length === 0) {
+    toast('Este usuario no tiene ciudad asignada');
+    return;
+  }
+  if (session.ciudades.length === 1) {
+    session.ciudad = session.ciudades[0];
+    localStorage.setItem('distribuidor_session', JSON.stringify(session));
+    showScreen('main-screen');
+    startApp();
+  } else if (session.ciudad) {
+    showScreen('main-screen');
+    startApp();
+  } else {
+    renderCityList();
+    showScreen('city-screen');
+  }
+}
+
+function renderCityList() {
+  const cont = document.getElementById('cityList');
+  cont.innerHTML = '';
+  session.ciudades.forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'city-btn';
+    b.textContent = c;
+    b.onclick = () => {
+      session.ciudad = c;
+      localStorage.setItem('distribuidor_session', JSON.stringify(session));
+      showScreen('main-screen');
+      startApp();
+    };
+    cont.appendChild(b);
+  });
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+document.getElementById('btnLogout').addEventListener('click', () => {
+  localStorage.removeItem('distribuidor_session');
+  session = null;
+  stopAutoRefresh();
+  document.getElementById('tabbar').style.display = 'none';
+  showScreen('login-screen');
+});
+
+document.getElementById('btnChangeCity').addEventListener('click', () => {
+  renderCityList();
+  showScreen('city-screen');
+});
+
+/* ======================================================================
+ *  ARRANQUE DE LA APP PRINCIPAL
+ * ==================================================================== */
+function startApp() {
+  document.getElementById('hdrCiudad').textContent = session.ciudad;
+  document.getElementById('hdrCorreo').textContent = session.correo;
+  document.getElementById('tabbar').style.display = 'flex';
+  refreshCurrentView();
+  startAutoRefresh();
+}
+
+// Restaurar sesión si ya existía
+if (session && session.ciudad) {
+  showScreen('main-screen');
+  startApp();
+} else if (session) {
+  goAfterLogin();
+}
+
+/* ======================================================================
+ *  TABS
+ * ==================================================================== */
+document.querySelectorAll('#tabbar .tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#tabbar .tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+    currentView = btn.dataset.view;
+    document.getElementById(currentView).style.display = 'block';
+    refreshCurrentView();
+  });
+});
+
+/* ======================================================================
+ *  REFRESH MANUAL / AUTOMÁTICO
+ * ==================================================================== */
+document.getElementById('btnRefresh').addEventListener('click', refreshCurrentView);
+
+document.getElementById('intervalSelect').addEventListener('change', (e) => {
+  startAutoRefresh(Number(e.target.value));
+});
+
+function startAutoRefresh(ms) {
+  stopAutoRefresh();
+  const val = ms !== undefined ? ms : Number(document.getElementById('intervalSelect').value);
+  const dot = document.getElementById('autoDot');
+  const label = document.getElementById('autoLabel');
+  if (!val) {
+    dot.classList.remove('live');
+    label.textContent = 'Auto: manual';
+    return;
+  }
+  dot.classList.add('live');
+  label.textContent = 'Auto: ' + (val === 30000 ? '30 seg' : val === 60000 ? '1 min' : '5 min');
+  autoTimer = setInterval(() => {
+    if (document.visibilityState === 'visible') refreshCurrentView(true);
+  }, val);
+}
+function stopAutoRefresh() { if (autoTimer) clearInterval(autoTimer); autoTimer = null; }
+
+async function refreshCurrentView(silent) {
+  if (!session || !session.ciudad) return;
+  try {
+    if (currentView === 'viewRemisiones') await loadRemisiones();
+    else if (currentView === 'viewConsignar') await loadConsignarView();
+    else if (currentView === 'viewStock') await loadStock();
+    else if (currentView === 'viewPendientes') await loadPendientes();
+  } catch (e) {
+    if (!silent) toast('Error: ' + e.message);
+  }
+}
+
+/* ======================================================================
+ *  VISTA REMISIONES
+ * ==================================================================== */
+async function loadRemisiones() {
+  const cont = document.getElementById('remisionesList');
+  const res = await apiCall('getRemisiones', { distribuidorId: session.id, ciudad: session.ciudad, soloPendientes: true });
+  cont.innerHTML = '';
+  if (!res.remisiones.length) {
+    cont.innerHTML = '<div class="empty-state">🎉 No hay remisiones pendientes</div>';
+    return;
+  }
+  res.remisiones.forEach(r => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="row"><strong>Remisión ${escapeHtml(r['REMISION'])}</strong><span class="badge pendiente">Pendiente</span></div>
+      <div class="muted">Fecha: ${escapeHtml(formatVal(r['FECHA']))}</div>
+      <div class="muted">Valor: $${formatMoney(r['VLR REMISION'])}</div>
+    `;
+    card.addEventListener('click', () => openModalRemision(r));
+    cont.appendChild(card);
+  });
+}
+
+function openModalRemision(r) {
+  selectedRemision = r;
+  modalFotoBase64 = null;
+  document.getElementById('modalTitle').textContent = 'Remisión ' + r['REMISION'];
+  document.getElementById('modalSub').textContent = 'Valor: $' + formatMoney(r['VLR REMISION']);
+  document.querySelectorAll('.chip-select .chip').forEach(c => c.classList.remove('active'));
+  document.getElementById('modalFecha').value = '';
+  document.getElementById('modalObs').value = '';
+  document.getElementById('modalFotoDrop').innerHTML = '📷 Toca para tomar/adjuntar foto';
+  document.getElementById('modalError').style.display = 'none';
+  document.getElementById('modalOverlay').classList.add('active');
+}
+
+document.getElementById('modalClose').addEventListener('click', () => {
+  document.getElementById('modalOverlay').classList.remove('active');
+});
+
+document.querySelectorAll('.chip-select .chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.chip-select .chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+  });
+});
+
+document.getElementById('modalFotoDrop').addEventListener('click', () => {
+  document.getElementById('modalFotoInput').click();
+});
+document.getElementById('modalFotoInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  modalFotoBase64 = await fileToBase64(file);
+  document.getElementById('modalFotoDrop').innerHTML = `✅ Foto lista <img src="${modalFotoBase64}">`;
+});
+
+document.getElementById('btnGuardarRemision').addEventListener('click', async () => {
+  const estadoChip = document.querySelector('.chip-select .chip.active');
+  const errEl = document.getElementById('modalError');
+  errEl.style.display = 'none';
+  if (!estadoChip) { errEl.textContent = 'Selecciona un estado'; errEl.style.display = 'block'; return; }
+
+  const btn = document.getElementById('btnGuardarRemision');
+  btn.innerHTML = '<span class="spinner"></span>Guardando...';
+  try {
+    await apiCall('updateRemision', {
+      row: selectedRemision.__row,
+      estado: estadoChip.dataset.estado,
+      fechaEntrega: document.getElementById('modalFecha').value,
+      observacion: document.getElementById('modalObs').value,
+      fotoBase64: modalFotoBase64
+    });
+    document.getElementById('modalOverlay').classList.remove('active');
+    toast('Remisión actualizada');
+    loadRemisiones();
+  } catch (e) {
+    errEl.textContent = e.message;
+    errEl.style.display = 'block';
+  } finally {
+    btn.innerHTML = 'Guardar';
+  }
+});
+
+/* ======================================================================
+ *  VISTA CONSIGNAR
+ * ==================================================================== */
+async function loadConsignarView() {
+  const res = await apiCall('getPendientes', { distribuidorId: session.id, ciudad: session.ciudad });
+  pendConsignacionesCache = res.consignacionesPendientes;
+  const cont = document.getElementById('checklistRemisiones');
+  cont.innerHTML = '';
+  if (!pendConsignacionesCache.length) {
+    cont.innerHTML = '<div class="empty-state">No hay remisiones entregadas pendientes de consignar</div>';
+  } else {
+    pendConsignacionesCache.forEach(r => {
+      const lab = document.createElement('label');
+      lab.innerHTML = `<input type="checkbox" value="${r.__row}" data-remision="${escapeHtml(r['REMISION'])}">
+        Remisión ${escapeHtml(r['REMISION'])} — $${formatMoney(r['VLR REMISION'])}`;
+      cont.appendChild(lab);
+    });
+  }
+  await loadConsignacionesHistorial();
+}
+
+async function loadConsignacionesHistorial() {
+  const res = await apiCall('getConsignaciones', { distribuidorId: session.id, ciudad: session.ciudad });
+  const cont = document.getElementById('consignacionesList');
+  cont.innerHTML = '';
+  if (!res.consignaciones.length) {
+    cont.innerHTML = '<div class="empty-state">Aún no has reportado consignaciones</div>';
+    return;
+  }
+  res.consignaciones.slice().reverse().forEach(c => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.innerHTML = `
+      <div class="row"><strong>Consignación #${escapeHtml(c['ID CONSIGNACIONES'])}</strong><span>$${formatMoney(c['VALOR CONSIGNADO'])}</span></div>
+      <div class="muted">Remisiones: ${escapeHtml(c['REMISIONES QUE CONSIGNA'] || '-')}</div>
+      <div class="muted">Fecha(s): ${escapeHtml(c['FECHAS DE ENTREGAS QUE CONSIGNA'] || '-')}</div>
+    `;
+    cont.appendChild(card);
+  });
+}
+
+document.getElementById('consFotoDrop').addEventListener('click', () => {
+  document.getElementById('consFotoInput').click();
+});
+document.getElementById('consFotoInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  consFotoBase64 = await fileToBase64(file);
+  document.getElementById('consFotoDrop').innerHTML = `✅ Foto lista <img src="${consFotoBase64}">`;
+});
+
+document.getElementById('btnEnviarConsignacion').addEventListener('click', async () => {
+  const msgEl = document.getElementById('consMsg');
+  msgEl.style.display = 'none';
+  const checks = Array.from(document.querySelectorAll('#checklistRemisiones input:checked'));
+  const valor = document.getElementById('consValor').value;
+  const fechas = document.getElementById('consFechas').value;
+
+  if (!checks.length) { toast('Selecciona al menos una remisión'); return; }
+  if (!valor) { toast('Indica el valor consignado'); return; }
+
+  const btn = document.getElementById('btnEnviarConsignacion');
+  btn.innerHTML = '<span class="spinner"></span>Enviando...';
+  try {
+    await apiCall('addConsignacion', {
+      distribuidorId: session.id,
+      ciudad: session.ciudad,
+      fechas: fechas,
+      valorConsignado: Number(valor),
+      fotoBase64: consFotoBase64,
+      remisiones: checks.map(c => c.dataset.remision),
+      remisionRows: checks.map(c => Number(c.value)),
+      observaciones: document.getElementById('consObs').value
+    });
+    msgEl.textContent = 'Consignación registrada correctamente';
+    msgEl.style.display = 'block';
+    document.getElementById('consFechas').value = '';
+    document.getElementById('consValor').value = '';
+    document.getElementById('consObs').value = '';
+    consFotoBase64 = null;
+    document.getElementById('consFotoDrop').innerHTML = '📷 Toca para tomar/adjuntar foto';
+    loadConsignarView();
+  } catch (e) {
+    toast('Error: ' + e.message);
+  } finally {
+    btn.innerHTML = 'Enviar consignación';
+  }
+});
+
+/* ======================================================================
+ *  VISTA STOCK
+ * ==================================================================== */
+async function loadStock() {
+  const res = await apiCall('getStock', { distribuidorId: session.id, ciudad: session.ciudad });
+  const cont = document.getElementById('stockCard');
+  cont.innerHTML = '';
+  if (!res.stock.length) {
+    cont.innerHTML = '<div class="empty-state">Sin datos de stock</div>';
+    return;
+  }
+  res.stock.forEach(p => {
+    const row = document.createElement('div');
+    row.className = 'stock-row';
+    row.innerHTML = `
+      <div>
+        <div><strong>${escapeHtml(p.producto)}</strong></div>
+        <div class="muted">Asignado: ${p.totalAsignado} · Entregado: ${p.totalEntregado}</div>
+      </div>
+      <div class="stock-num ${p.stock < 0 ? 'neg' : ''}">${p.stock}</div>
+    `;
+    cont.appendChild(row);
+  });
+}
+
+/* ======================================================================
+ *  VISTA PENDIENTES
+ * ==================================================================== */
+async function loadPendientes() {
+  const res = await apiCall('getPendientes', { distribuidorId: session.id, ciudad: session.ciudad });
+
+  const contE = document.getElementById('pendEntregas');
+  contE.innerHTML = '';
+  if (!res.entregasPendientes.length) {
+    contE.innerHTML = '<div class="empty-state">No hay entregas pendientes</div>';
+  } else {
+    res.entregasPendientes.forEach(r => {
+      const estado = String(r['ESTADO'] || '').trim();
+      const badgeClass = estado.toLowerCase() === 'reprogramado' ? 'reprogramado' : 'pendiente';
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <div class="row"><strong>Remisión ${escapeHtml(r['REMISION'])}</strong><span class="badge ${badgeClass}">${estado || 'Pendiente'}</span></div>
+        <div class="muted">Fecha: ${escapeHtml(formatVal(r['FECHA']))} · Valor: $${formatMoney(r['VLR REMISION'])}</div>
+      `;
+      contE.appendChild(card);
+    });
+  }
+
+  const contC = document.getElementById('pendConsignaciones');
+  contC.innerHTML = '';
+  if (!res.consignacionesPendientes.length) {
+    contC.innerHTML = '<div class="empty-state">No hay consignaciones pendientes</div>';
+  } else {
+    let total = 0;
+    res.consignacionesPendientes.forEach(r => {
+      total += Number(r['VLR REMISION']) || 0;
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <div class="row"><strong>Remisión ${escapeHtml(r['REMISION'])}</strong><span class="badge entregado">Entregado</span></div>
+        <div class="muted">Por consignar: $${formatMoney(r['VLR REMISION'])}</div>
+      `;
+      contC.appendChild(card);
+    });
+    const totalBox = document.createElement('div');
+    totalBox.className = 'total-box';
+    totalBox.innerHTML = `<span>Total por consignar</span><span>$${formatMoney(total)}</span>`;
+    contC.appendChild(totalBox);
+  }
+}
+
+/* ======================================================================
+ *  UTILIDADES
+ * ==================================================================== */
+function escapeHtml(v) {
+  if (v === null || v === undefined) return '';
+  return String(v).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+}
+function formatMoney(v) {
+  const n = Number(v) || 0;
+  return n.toLocaleString('es-CO');
+}
+function formatVal(v) {
+  if (!v) return '-';
+  if (v instanceof Date) return v.toLocaleDateString('es-CO');
+  // Apps Script a veces envía fechas como string ISO
+  const d = new Date(v);
+  if (!isNaN(d.getTime()) && String(v).length > 8) return d.toLocaleDateString('es-CO');
+  return String(v);
+}
+
+/* ======================================================================
+ *  REGISTRO DEL SERVICE WORKER (PWA instalable)
+ * ==================================================================== */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
