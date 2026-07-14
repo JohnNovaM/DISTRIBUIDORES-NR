@@ -6,7 +6,6 @@
 <title>App Distribuidores</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1e6b52">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
     --primary:#1e6b52;
@@ -50,10 +49,6 @@
     width:100%;padding:12px;background:#fff;color:var(--primary);border:1.5px solid var(--primary);border-radius:10px;
     font-size:14px;font-weight:600;margin-top:10px;cursor:pointer;
   }
-  button.small-btn{
-    padding:8px 12px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;
-  }
-  button.small-btn.outline{background:#fff;color:var(--primary);border:1.3px solid var(--primary);}
   .error-msg{color:var(--danger);font-size:13px;margin-top:10px;display:none;}
   .success-msg{color:var(--ok);font-size:13px;margin-top:10px;display:none;}
 
@@ -65,7 +60,6 @@
   header.appbar .info{display:flex;flex-direction:column;}
   header.appbar .info .city{font-weight:700;font-size:15px;}
   header.appbar .info .mail{font-size:11px;opacity:.85;}
-  header.appbar .rolbadge{font-size:9.5px;background:rgba(255,255,255,.22);padding:2px 8px;border-radius:10px;display:inline-block;margin-top:3px;width:fit-content;font-weight:700;letter-spacing:.03em;}
   header.appbar .actions{display:flex;gap:8px;align-items:center;}
   header.appbar button.icon-btn{
     background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:8px;padding:8px 10px;font-size:13px;cursor:pointer;
@@ -73,7 +67,7 @@
 
   .refresh-bar{
     display:flex;align-items:center;gap:8px;padding:10px 16px;background:#eef3f1;border-bottom:1px solid var(--border);
-    font-size:12px;color:var(--muted);flex-wrap:wrap;
+    font-size:12px;color:var(--muted);
   }
   .refresh-bar select{width:auto;padding:6px 8px;font-size:12px;border-radius:8px;}
   .refresh-bar .refresh-btn{
@@ -82,32 +76,19 @@
   .refresh-bar .dot{width:7px;height:7px;border-radius:50%;background:#9aa;display:inline-block;}
   .refresh-bar .dot.live{background:#2ecc71;}
 
-  /* ---- Filtro de ciudad (roles con acceso total) ---- */
-  .city-filter-bar{
-    display:flex;gap:8px;padding:10px 16px;overflow-x:auto;background:#fff;border-bottom:1px solid var(--border);
-  }
-  .city-chip{
-    flex:0 0 auto;padding:7px 14px;border-radius:20px;border:1.3px solid var(--border);font-size:12.5px;font-weight:600;
-    color:var(--muted);cursor:pointer;white-space:nowrap;background:#fff;
-  }
-  .city-chip.active{background:var(--primary);border-color:var(--primary);color:#fff;}
-
   /* ---- Contenido ---- */
   main{padding:14px 16px;flex:1;}
   .card{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.05);border:1px solid var(--border);}
   .card .row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;}
   .card .row strong{font-size:15px;}
   .card .muted{color:var(--muted);font-size:12.5px;}
-  .card .actions-row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
   .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;}
   .badge.pendiente{background:#fde9c8;color:var(--warning);}
   .badge.entregado{background:#d7f0e5;color:var(--ok);}
   .badge.caido{background:#f8d7d2;color:var(--danger);}
   .badge.reprogramado{background:#dbe6fb;color:#2a5bd7;}
-  .badge.na{background:#eee;color:var(--muted);}
   .empty-state{text-align:center;color:var(--muted);padding:40px 16px;font-size:14px;}
-  .section-title{font-size:13px;font-weight:700;text-transform:uppercase;color:var(--muted);margin:18px 0 8px;letter-spacing:.03em;display:flex;justify-content:space-between;align-items:center;}
-  .toggle-row{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin-bottom:10px;}
+  .section-title{font-size:13px;font-weight:700;text-transform:uppercase;color:var(--muted);margin:18px 0 8px;letter-spacing:.03em;}
 
   /* ---- Tabs inferiores ---- */
   nav.tabbar{
@@ -163,10 +144,6 @@
   .stock-num{font-weight:700;font-size:15px;}
   .stock-num.neg{color:var(--danger);}
   .total-box{background:#eef3f1;border-radius:12px;padding:14px;margin-top:12px;display:flex;justify-content:space-between;font-weight:700;}
-  .cartera-check{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);font-size:13px;font-weight:600;}
-  .cartera-check input{width:auto;}
-  .product-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px;}
-  .product-grid .pfield label{margin:0 0 4px;}
 </style>
 </head>
 <body>
@@ -186,7 +163,7 @@
     </div>
   </section>
 
-  <!-- ===================== SELECCIÓN DE CIUDAD (solo distribuidor con varias ciudades) ===================== -->
+  <!-- ===================== SELECCIÓN DE CIUDAD ===================== -->
   <section id="city-screen" class="screen" style="padding:24px;">
     <h1 style="font-size:20px;color:var(--primary-dark);">Selecciona tu ciudad</h1>
     <p class="sub" style="color:var(--muted);margin-bottom:20px;">Tienes varias ciudades a cargo</p>
@@ -200,15 +177,12 @@
         <span class="city" id="hdrCiudad">Ciudad</span>
         <span class="mail" id="hdrNombre">Nombre</span>
         <span class="mail" id="hdrCorreo">correo@ejemplo.com</span>
-        <span class="rolbadge" id="hdrRol">ROL</span>
       </div>
       <div class="actions">
         <button class="icon-btn" id="btnChangeCity" title="Cambiar ciudad">🏙️</button>
         <button class="icon-btn" id="btnLogout" title="Salir">Salir</button>
       </div>
     </header>
-
-    <div class="city-filter-bar" id="cityFilterBar" style="display:none;"></div>
 
     <div class="refresh-bar">
       <span class="dot" id="autoDot"></span>
@@ -223,42 +197,25 @@
     </div>
 
     <main id="viewRemisiones" class="view">
-      <div class="section-title">
-        <span id="tituloRemisiones">Remisiones pendientes</span>
-        <button class="small-btn" id="btnNuevaRemision" style="display:none;">+ Nueva</button>
-      </div>
-      <div class="toggle-row" id="toggleSoloPendientesRow" style="display:none;">
-        <input type="checkbox" id="toggleSoloPendientes"> <label style="margin:0;font-weight:500;" for="toggleSoloPendientes">Ver solo pendientes</label>
-      </div>
+      <div class="section-title">Remisiones pendientes</div>
       <div id="remisionesList"></div>
     </main>
 
     <main id="viewConsignar" class="view" style="display:none;">
-      <div id="consignarFormWrap">
-        <div class="section-title">Reportar consignación</div>
-        <label>Remisiones que incluye esta consignación</label>
-        <div class="checklist" id="checklistRemisiones"></div>
-        <label>Fecha(s) de entrega que consigna</label>
-        <input type="text" id="consFechas" placeholder="Ej: 10/07, 11/07/2026">
-        <label>Valor consignado</label>
-        <input type="number" id="consValor" placeholder="0">
-        <label>Comprobante (foto)</label>
-        <div class="file-drop" id="consFotoDrop">📷 Toca para tomar/adjuntar foto</div>
-        <input type="file" id="consFotoInput" accept="image/*" capture="environment" style="display:none;">
-        <label>Observaciones</label>
-        <textarea id="consObs" placeholder="Notas adicionales..."></textarea>
-        <button class="primary" id="btnEnviarConsignacion">Enviar consignación</button>
-        <p class="success-msg" id="consMsg"></p>
-      </div>
-
-      <div id="exportExcelWrap" style="display:none;">
-        <div class="section-title">Exportar Excel por fecha</div>
-        <label>Desde</label>
-        <input type="date" id="exportDesde">
-        <label>Hasta</label>
-        <input type="date" id="exportHasta">
-        <button class="secondary" id="btnExportarExcel">⬇ Descargar Excel</button>
-      </div>
+      <div class="section-title">Reportar consignación</div>
+      <label>Remisiones que incluye esta consignación</label>
+      <div class="checklist" id="checklistRemisiones"></div>
+      <label>Fecha(s) de entrega que consigna</label>
+      <input type="text" id="consFechas" placeholder="Ej: 10/07, 11/07/2026">
+      <label>Valor consignado</label>
+      <input type="number" id="consValor" placeholder="0">
+      <label>Comprobante (foto)</label>
+      <div class="file-drop" id="consFotoDrop">📷 Toca para tomar/adjuntar foto</div>
+      <input type="file" id="consFotoInput" accept="image/*" capture="environment" style="display:none;">
+      <label>Observaciones</label>
+      <textarea id="consObs" placeholder="Notas adicionales..."></textarea>
+      <button class="primary" id="btnEnviarConsignacion">Enviar consignación</button>
+      <p class="success-msg" id="consMsg"></p>
 
       <div class="section-title">Historial de consignaciones</div>
       <div id="consignacionesList"></div>
@@ -272,25 +229,8 @@
     <main id="viewPendientes" class="view" style="display:none;">
       <div class="section-title">Entregas pendientes</div>
       <div id="pendEntregas"></div>
-      <div class="section-title">Consignaciones pendientes (reporte distribuidor)</div>
+      <div class="section-title">Consignaciones pendientes</div>
       <div id="pendConsignaciones"></div>
-      <div id="pendCarteraWrap" style="display:none;">
-        <div class="section-title">Pendientes de confirmar (Cartera)</div>
-        <div id="pendCartera"></div>
-      </div>
-    </main>
-
-    <main id="viewEntradas" class="view" style="display:none;">
-      <div class="section-title">Registrar entrada de stock</div>
-      <label>Distribuidor</label>
-      <select id="entDistribuidor"></select>
-      <label>Ciudad</label>
-      <select id="entCiudad"></select>
-      <label>Fecha</label>
-      <input type="date" id="entFecha">
-      <div class="product-grid" id="entProductGrid"></div>
-      <button class="primary" id="btnGuardarEntrada">Guardar entrada</button>
-      <p class="success-msg" id="entMsg"></p>
     </main>
   </section>
 
@@ -299,11 +239,10 @@
     <button data-view="viewConsignar" class="tab"><span class="ic">💵</span>Consignar</button>
     <button data-view="viewStock" class="tab"><span class="ic">📊</span>Stock</button>
     <button data-view="viewPendientes" class="tab"><span class="ic">⏳</span>Pendientes</button>
-    <button data-view="viewEntradas" class="tab"><span class="ic">📥</span>Entradas</button>
   </nav>
 </div>
 
-<!-- ===================== MODAL DETALLE REMISIÓN (Distribuidor) ===================== -->
+<!-- ===================== MODAL DETALLE REMISIÓN ===================== -->
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
     <div class="modal-header">
@@ -334,22 +273,6 @@
   </div>
 </div>
 
-<!-- ===================== MODAL NUEVA REMISIÓN (Logística/Administrador) ===================== -->
-<div class="modal-overlay" id="modalNuevaOverlay">
-  <div class="modal">
-    <div class="modal-header">
-      <h2>Nueva remisión</h2>
-      <button class="close-x" id="modalNuevaClose">✕</button>
-    </div>
-    <p class="muted">Solo escribe el número de remisión — el distribuidor, cliente y productos se completan automáticamente desde tu hoja de ventas.</p>
-    <label>Número de remisión</label>
-    <input type="text" id="nuevaRemisionNum" placeholder="Ej: 10234">
-    <button class="primary" id="btnCrearRemision">Crear</button>
-    <p class="error-msg" id="nuevaRemisionError"></p>
-    <p class="success-msg" id="nuevaRemisionMsg"></p>
-  </div>
-</div>
-
 <div class="toast" id="toast"></div>
 
 <script>
@@ -357,25 +280,7 @@
  *  CONFIGURACIÓN — pega aquí la URL de tu Web App de Apps Script
  *  (termina en /exec). La obtienes al implementar Code.gs.
  * ==================================================================== */
-const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxmcxJgVlY2iw4JV3kBkOj-DVnPNi5WqjQBBLViUsUHeBXfyBx7WrjvwYvslty6eeCUNg/exec';
-
-/* ======================================================================
- *  TABS VISIBLES POR ROL
- * ==================================================================== */
-const TABS_BY_ROLE = {
-  'DISTRIBUIDOR': ['viewRemisiones', 'viewConsignar', 'viewStock', 'viewPendientes'],
-  'GERENCIA':     ['viewRemisiones', 'viewConsignar', 'viewStock', 'viewPendientes'],
-  'ADMINISTRADOR':['viewRemisiones', 'viewConsignar', 'viewStock', 'viewPendientes', 'viewEntradas'],
-  'LOGISTICA':    ['viewRemisiones', 'viewStock', 'viewEntradas'],
-  'CARTERA':      ['viewRemisiones', 'viewConsignar', 'viewPendientes']
-};
-const TAB_LABELS = {
-  viewRemisiones: { ic: '📦', label: 'Remisiones' },
-  viewConsignar: { ic: '💵', label: 'Consignar' },
-  viewStock: { ic: '📊', label: 'Stock' },
-  viewPendientes: { ic: '⏳', label: 'Pendientes' },
-  viewEntradas: { ic: '📥', label: 'Entradas' }
-};
+const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbytlLNStb8E-C4h9j8hCbChqWyih2MWAMe5DjSiHiQUpHBuFui70OSdwHiRxkaZDmTH4Q/exec';
 
 /* ======================================================================
  *  ESTADO
@@ -383,27 +288,15 @@ const TAB_LABELS = {
 let session = JSON.parse(localStorage.getItem('distribuidor_session') || 'null');
 let currentView = 'viewRemisiones';
 let autoTimer = null;
-let selectedRemision = null;
+let selectedRemision = null; // remision abierta en el modal
 let modalFotoBase64 = null;
 let consFotoBase64 = null;
 let pendConsignacionesCache = [];
-let productHeadersCache = [];
-
-function rolUpper() { return session && session.rol ? String(session.rol).toUpperCase() : 'DISTRIBUIDOR'; }
-function esDistribuidor() { return rolUpper() === 'DISTRIBUIDOR'; }
-function esGerencia() { return rolUpper() === 'GERENCIA'; }
-function puedeCrearRemision() { return ['ADMINISTRADOR', 'LOGISTICA'].indexOf(rolUpper()) !== -1; }
-function puedeGenerarPDF() { return ['ADMINISTRADOR', 'LOGISTICA'].indexOf(rolUpper()) !== -1; }
-function puedeConfirmarCartera() { return ['ADMINISTRADOR', 'CARTERA'].indexOf(rolUpper()) !== -1; }
-function puedeExportarExcel() { return ['ADMINISTRADOR', 'CARTERA'].indexOf(rolUpper()) !== -1; }
-function puedeCrearConsignacion() { return rolUpper() === 'DISTRIBUIDOR'; }
 
 /* ======================================================================
  *  API
  * ==================================================================== */
 async function apiCall(action, data) {
-  data = data || {};
-  if (session) { data.rol = session.rol; }
   const res = await fetch(WEB_APP_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -443,7 +336,7 @@ document.getElementById('btnLogin').addEventListener('click', async () => {
   const btn = document.getElementById('btnLogin');
   btn.innerHTML = '<span class="spinner"></span>Ingresando...';
   try {
-    const res = await apiCallLogin(correo, pass);
+    const res = await apiCall('login', { correo, password: pass });
     session = res.distribuidor;
     localStorage.setItem('distribuidor_session', JSON.stringify(session));
     goAfterLogin();
@@ -455,26 +348,7 @@ document.getElementById('btnLogin').addEventListener('click', async () => {
   }
 });
 
-// Login no necesita "rol" en el payload (aún no lo tenemos)
-async function apiCallLogin(correo, password) {
-  const res = await fetch(WEB_APP_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action: 'login', data: { correo, password } })
-  });
-  const json = await res.json();
-  if (!json.ok) throw new Error(json.error || 'Error desconocido');
-  return json;
-}
-
 function goAfterLogin() {
-  if (session.verTodas) {
-    session.ciudad = session.ciudad || '';
-    localStorage.setItem('distribuidor_session', JSON.stringify(session));
-    showScreen('main-screen');
-    startApp();
-    return;
-  }
   if (!session.ciudades || session.ciudades.length === 0) {
     toast('Este usuario no tiene ciudad asignada');
     return;
@@ -524,7 +398,6 @@ document.getElementById('btnLogout').addEventListener('click', () => {
 });
 
 document.getElementById('btnChangeCity').addEventListener('click', () => {
-  if (session.verTodas) { toast('Usa los botones de filtro de ciudad arriba'); return; }
   renderCityList();
   showScreen('city-screen');
 });
@@ -532,34 +405,17 @@ document.getElementById('btnChangeCity').addEventListener('click', () => {
 /* ======================================================================
  *  ARRANQUE DE LA APP PRINCIPAL
  * ==================================================================== */
-async function startApp() {
-  document.getElementById('hdrCiudad').textContent = session.ciudad || 'Todas las ciudades';
+function startApp() {
+  document.getElementById('hdrCiudad').textContent = session.ciudad;
   document.getElementById('hdrNombre').textContent = session.nombre || '';
   document.getElementById('hdrCorreo').textContent = session.correo;
-  document.getElementById('hdrRol').textContent = (session.rol || 'Distribuidor').toUpperCase();
   document.getElementById('tabbar').style.display = 'flex';
-
-  renderTabsForRole();
-
-  if (session.verTodas) {
-    await renderCityFilterBar();
-  } else {
-    document.getElementById('cityFilterBar').style.display = 'none';
-  }
-
-  document.getElementById('btnNuevaRemision').style.display = puedeCrearRemision() ? 'inline-block' : 'none';
-  document.getElementById('toggleSoloPendientesRow').style.display = session.verTodas ? 'flex' : 'none';
-  document.getElementById('toggleSoloPendientes').checked = !session.verTodas;
-
-  document.getElementById('consignarFormWrap').style.display = puedeCrearConsignacion() ? 'block' : 'none';
-  document.getElementById('exportExcelWrap').style.display = puedeExportarExcel() ? 'block' : 'none';
-
   refreshCurrentView();
   startAutoRefresh();
 }
 
 // Restaurar sesión si ya existía
-if (session && (session.ciudad || session.verTodas)) {
+if (session && session.ciudad) {
   showScreen('main-screen');
   startApp();
 } else if (session) {
@@ -567,84 +423,38 @@ if (session && (session.ciudad || session.verTodas)) {
 }
 
 /* ======================================================================
- *  TABS SEGÚN ROL
+ *  TABS
  * ==================================================================== */
-function renderTabsForRole() {
-  const permitidas = TABS_BY_ROLE[rolUpper()] || TABS_BY_ROLE['DISTRIBUIDOR'];
-  const tabbar = document.getElementById('tabbar');
-  tabbar.innerHTML = '';
-  permitidas.forEach((viewId, i) => {
-    const meta = TAB_LABELS[viewId];
-    const btn = document.createElement('button');
-    btn.className = 'tab' + (i === 0 ? ' active' : '');
-    btn.dataset.view = viewId;
-    btn.innerHTML = '<span class="ic">' + meta.ic + '</span>' + meta.label;
-    btn.addEventListener('click', () => selectTab(viewId, btn));
-    tabbar.appendChild(btn);
+document.querySelectorAll('#tabbar .tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#tabbar .tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+    currentView = btn.dataset.view;
+    document.getElementById(currentView).style.display = 'block';
+    refreshCurrentView();
   });
-  document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
-  currentView = permitidas[0];
-  document.getElementById(currentView).style.display = 'block';
-}
-
-function selectTab(viewId, btnEl) {
-  document.querySelectorAll('#tabbar .tab').forEach(b => b.classList.remove('active'));
-  btnEl.classList.add('active');
-  document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
-  currentView = viewId;
-  document.getElementById(viewId).style.display = 'block';
-  refreshCurrentView();
-}
-
-/* ======================================================================
- *  FILTRO DE CIUDAD (roles con acceso total)
- * ==================================================================== */
-async function renderCityFilterBar() {
-  const bar = document.getElementById('cityFilterBar');
-  bar.style.display = 'flex';
-  bar.innerHTML = '<span class="city-chip">Cargando...</span>';
-  try {
-    const res = await apiCall('getCiudades', {});
-    bar.innerHTML = '';
-    const chipTodas = document.createElement('div');
-    chipTodas.className = 'city-chip' + (!session.ciudad ? ' active' : '');
-    chipTodas.textContent = 'Todas';
-    chipTodas.onclick = () => selectCiudadFiltro('', chipTodas);
-    bar.appendChild(chipTodas);
-    res.ciudades.forEach(c => {
-      const chip = document.createElement('div');
-      chip.className = 'city-chip' + (session.ciudad === c ? ' active' : '');
-      chip.textContent = c;
-      chip.onclick = () => selectCiudadFiltro(c, chip);
-      bar.appendChild(chip);
-    });
-  } catch (e) {
-    bar.innerHTML = '';
-  }
-}
-
-function selectCiudadFiltro(ciudad, chipEl) {
-  session.ciudad = ciudad;
-  localStorage.setItem('distribuidor_session', JSON.stringify(session));
-  document.querySelectorAll('.city-chip').forEach(c => c.classList.remove('active'));
-  chipEl.classList.add('active');
-  document.getElementById('hdrCiudad').textContent = ciudad || 'Todas las ciudades';
-  refreshCurrentView();
-}
+});
 
 /* ======================================================================
  *  REFRESH MANUAL / AUTOMÁTICO
  * ==================================================================== */
 document.getElementById('btnRefresh').addEventListener('click', refreshCurrentView);
-document.getElementById('intervalSelect').addEventListener('change', (e) => startAutoRefresh(Number(e.target.value)));
-document.getElementById('toggleSoloPendientes').addEventListener('change', loadRemisiones);
+
+document.getElementById('intervalSelect').addEventListener('change', (e) => {
+  startAutoRefresh(Number(e.target.value));
+});
 
 function startAutoRefresh(ms) {
   stopAutoRefresh();
   const val = ms !== undefined ? ms : Number(document.getElementById('intervalSelect').value);
   const dot = document.getElementById('autoDot');
   const label = document.getElementById('autoLabel');
-  if (!val) { dot.classList.remove('live'); label.textContent = 'Auto: manual'; return; }
+  if (!val) {
+    dot.classList.remove('live');
+    label.textContent = 'Auto: manual';
+    return;
+  }
   dot.classList.add('live');
   label.textContent = 'Auto: ' + (val === 30000 ? '30 seg' : val === 60000 ? '1 min' : '5 min');
   autoTimer = setInterval(() => {
@@ -654,13 +464,12 @@ function startAutoRefresh(ms) {
 function stopAutoRefresh() { if (autoTimer) clearInterval(autoTimer); autoTimer = null; }
 
 async function refreshCurrentView(silent) {
-  if (!session) return;
+  if (!session || !session.ciudad) return;
   try {
     if (currentView === 'viewRemisiones') await loadRemisiones();
     else if (currentView === 'viewConsignar') await loadConsignarView();
     else if (currentView === 'viewStock') await loadStock();
     else if (currentView === 'viewPendientes') await loadPendientes();
-    else if (currentView === 'viewEntradas') await loadEntradasView();
   } catch (e) {
     if (!silent) toast('Error: ' + e.message);
   }
@@ -671,77 +480,21 @@ async function refreshCurrentView(silent) {
  * ==================================================================== */
 async function loadRemisiones() {
   const cont = document.getElementById('remisionesList');
-  const soloPendientes = document.getElementById('toggleSoloPendientes').checked;
-  document.getElementById('tituloRemisiones').textContent = soloPendientes ? 'Remisiones pendientes' : 'Todas las remisiones';
-
-  const res = await apiCall('getRemisiones', {
-    distribuidorId: session.id, nombre: session.nombre, ciudad: session.ciudad,
-    verTodas: !!session.verTodas, soloPendientes: soloPendientes
-  });
+  const res = await apiCall('getRemisiones', { distribuidorId: session.id, nombre: session.nombre, ciudad: session.ciudad, soloPendientes: true });
   cont.innerHTML = '';
   if (!res.remisiones.length) {
-    cont.innerHTML = '<div class="empty-state">🎉 No hay remisiones para mostrar</div>';
+    cont.innerHTML = '<div class="empty-state">🎉 No hay remisiones pendientes</div>';
     return;
   }
   res.remisiones.forEach(r => {
-    const estado = String(r['ESTADO'] || '').trim();
-    const badgeClass = estado ? (estado.toLowerCase() === 'entregado' ? 'entregado' : estado.toLowerCase() === 'caído' || estado.toLowerCase() === 'caido' ? 'caido' : 'reprogramado') : 'pendiente';
     const card = document.createElement('div');
     card.className = 'card';
-    let extra = '';
-    if (!esDistribuidor()) {
-      extra += '<div class="muted">Distribuidor: ' + escapeHtml(r['ID DISTRIBUIDOR']) + ' · Ciudad: ' + escapeHtml(r['ID CIUDAD']) + '</div>';
-      extra += '<div class="muted">Cliente: ' + escapeHtml(r['NOMBRE']) + '</div>';
-    }
-    let botones = '<div class="actions-row"></div>';
     card.innerHTML = `
-      <div class="row"><strong>Remisión ${escapeHtml(r['REMISION'])}</strong><span class="badge ${badgeClass}">${estado || 'Pendiente'}</span></div>
-      ${extra}
+      <div class="row"><strong>Remisión ${escapeHtml(r['REMISION'])}</strong><span class="badge pendiente">Pendiente</span></div>
       <div class="muted">Fecha: ${escapeHtml(formatVal(r['FECHA']))}</div>
       <div class="muted">Valor: $${formatMoney(r['VLR REMISION'])}</div>
-      ${botones}
     `;
-    const actionsRow = card.querySelector('.actions-row');
-
-    if (esDistribuidor()) {
-      card.style.cursor = 'pointer';
-      card.addEventListener('click', () => openModalRemision(r));
-    }
-
-    if (puedeGenerarPDF()) {
-      const btnPdf = document.createElement('button');
-      btnPdf.className = 'small-btn outline';
-      btnPdf.textContent = r['PDF REMISION'] ? '📄 Ver PDF' : '📄 Generar PDF';
-      btnPdf.onclick = async (ev) => {
-        ev.stopPropagation();
-        if (r['PDF REMISION']) { window.open(r['PDF REMISION'], '_blank'); return; }
-        btnPdf.innerHTML = '<span class="spinner"></span>';
-        try {
-          const res2 = await apiCall('generarPDF', { row: r.__row });
-          window.open(res2.url, '_blank');
-          toast('PDF generado');
-          loadRemisiones();
-        } catch (e) { toast('Error: ' + e.message); btnPdf.textContent = '📄 Generar PDF'; }
-      };
-      actionsRow.appendChild(btnPdf);
-    }
-
-    if (puedeConfirmarCartera() && estado.toLowerCase() === 'entregado') {
-      const wrap = document.createElement('div');
-      wrap.className = 'cartera-check';
-      const confirmado = String(r['CONFIRMADO CARTERA'] || '').trim().toUpperCase() === 'SI';
-      wrap.innerHTML = `<input type="checkbox" ${confirmado ? 'checked' : ''}> <span>Pago confirmado por Cartera</span>`;
-      const chk = wrap.querySelector('input');
-      chk.addEventListener('click', (ev) => ev.stopPropagation());
-      chk.addEventListener('change', async () => {
-        try {
-          await apiCall('confirmarCartera', { row: r.__row, confirmado: chk.checked });
-          toast('Actualizado');
-        } catch (e) { toast('Error: ' + e.message); chk.checked = !chk.checked; }
-      });
-      card.appendChild(wrap);
-    }
-
+    card.addEventListener('click', () => openModalRemision(r));
     cont.appendChild(card);
   });
 }
@@ -759,30 +512,39 @@ function openModalRemision(r) {
   document.getElementById('modalOverlay').classList.add('active');
 }
 
-document.getElementById('modalClose').addEventListener('click', () => document.getElementById('modalOverlay').classList.remove('active'));
+document.getElementById('modalClose').addEventListener('click', () => {
+  document.getElementById('modalOverlay').classList.remove('active');
+});
+
 document.querySelectorAll('.chip-select .chip').forEach(chip => {
   chip.addEventListener('click', () => {
     document.querySelectorAll('.chip-select .chip').forEach(c => c.classList.remove('active'));
     chip.classList.add('active');
   });
 });
-document.getElementById('modalFotoDrop').addEventListener('click', () => document.getElementById('modalFotoInput').click());
+
+document.getElementById('modalFotoDrop').addEventListener('click', () => {
+  document.getElementById('modalFotoInput').click();
+});
 document.getElementById('modalFotoInput').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
   modalFotoBase64 = await fileToBase64(file);
   document.getElementById('modalFotoDrop').innerHTML = `✅ Foto lista <img src="${modalFotoBase64}">`;
 });
+
 document.getElementById('btnGuardarRemision').addEventListener('click', async () => {
   const estadoChip = document.querySelector('.chip-select .chip.active');
   const errEl = document.getElementById('modalError');
   errEl.style.display = 'none';
   if (!estadoChip) { errEl.textContent = 'Selecciona un estado'; errEl.style.display = 'block'; return; }
+
   const btn = document.getElementById('btnGuardarRemision');
   btn.innerHTML = '<span class="spinner"></span>Guardando...';
   try {
     await apiCall('updateRemision', {
-      row: selectedRemision.__row, estado: estadoChip.dataset.estado,
+      row: selectedRemision.__row,
+      estado: estadoChip.dataset.estado,
       fechaEntrega: document.getElementById('modalFecha').value,
       observacion: document.getElementById('modalObs').value,
       fotoBase64: modalFotoBase64
@@ -790,65 +552,41 @@ document.getElementById('btnGuardarRemision').addEventListener('click', async ()
     document.getElementById('modalOverlay').classList.remove('active');
     toast('Remisión actualizada');
     loadRemisiones();
-  } catch (e) { errEl.textContent = e.message; errEl.style.display = 'block'; }
-  finally { btn.innerHTML = 'Guardar'; }
-});
-
-/* ---- Crear remisión (Logística / Administrador) ---- */
-document.getElementById('btnNuevaRemision').addEventListener('click', () => {
-  document.getElementById('nuevaRemisionNum').value = '';
-  document.getElementById('nuevaRemisionError').style.display = 'none';
-  document.getElementById('nuevaRemisionMsg').style.display = 'none';
-  document.getElementById('modalNuevaOverlay').classList.add('active');
-});
-document.getElementById('modalNuevaClose').addEventListener('click', () => document.getElementById('modalNuevaOverlay').classList.remove('active'));
-document.getElementById('btnCrearRemision').addEventListener('click', async () => {
-  const remision = document.getElementById('nuevaRemisionNum').value.trim();
-  const errEl = document.getElementById('nuevaRemisionError');
-  const msgEl = document.getElementById('nuevaRemisionMsg');
-  errEl.style.display = 'none'; msgEl.style.display = 'none';
-  if (!remision) { errEl.textContent = 'Escribe el número de remisión'; errEl.style.display = 'block'; return; }
-  const btn = document.getElementById('btnCrearRemision');
-  btn.innerHTML = '<span class="spinner"></span>Creando...';
-  try {
-    await apiCall('crearRemision', { remision: remision });
-    msgEl.textContent = 'Remisión creada correctamente';
-    msgEl.style.display = 'block';
-    loadRemisiones();
-    setTimeout(() => document.getElementById('modalNuevaOverlay').classList.remove('active'), 1200);
-  } catch (e) { errEl.textContent = e.message; errEl.style.display = 'block'; }
-  finally { btn.innerHTML = 'Crear'; }
+  } catch (e) {
+    errEl.textContent = e.message;
+    errEl.style.display = 'block';
+  } finally {
+    btn.innerHTML = 'Guardar';
+  }
 });
 
 /* ======================================================================
  *  VISTA CONSIGNAR
  * ==================================================================== */
 async function loadConsignarView() {
-  if (puedeCrearConsignacion()) {
-    const res = await apiCall('getPendientes', { distribuidorId: session.id, nombre: session.nombre, ciudad: session.ciudad, verTodas: !!session.verTodas });
-    pendConsignacionesCache = res.consignacionesPendientes;
-    const cont = document.getElementById('checklistRemisiones');
-    cont.innerHTML = '';
-    if (!pendConsignacionesCache.length) {
-      cont.innerHTML = '<div class="empty-state">No hay remisiones entregadas pendientes de consignar</div>';
-    } else {
-      pendConsignacionesCache.forEach(r => {
-        const lab = document.createElement('label');
-        lab.innerHTML = `<input type="checkbox" value="${r.__row}" data-remision="${escapeHtml(r['REMISION'])}">
-          Remisión ${escapeHtml(r['REMISION'])} — $${formatMoney(r['VLR REMISION'])}`;
-        cont.appendChild(lab);
-      });
-    }
+  const res = await apiCall('getPendientes', { distribuidorId: session.id, nombre: session.nombre, ciudad: session.ciudad });
+  pendConsignacionesCache = res.consignacionesPendientes;
+  const cont = document.getElementById('checklistRemisiones');
+  cont.innerHTML = '';
+  if (!pendConsignacionesCache.length) {
+    cont.innerHTML = '<div class="empty-state">No hay remisiones entregadas pendientes de consignar</div>';
+  } else {
+    pendConsignacionesCache.forEach(r => {
+      const lab = document.createElement('label');
+      lab.innerHTML = `<input type="checkbox" value="${r.__row}" data-remision="${escapeHtml(r['REMISION'])}">
+        Remisión ${escapeHtml(r['REMISION'])} — $${formatMoney(r['VLR REMISION'])}`;
+      cont.appendChild(lab);
+    });
   }
   await loadConsignacionesHistorial();
 }
 
 async function loadConsignacionesHistorial() {
-  const res = await apiCall('getConsignaciones', { distribuidorId: session.id, nombre: session.nombre, ciudad: session.ciudad, verTodas: !!session.verTodas });
+  const res = await apiCall('getConsignaciones', { distribuidorId: session.id, nombre: session.nombre, ciudad: session.ciudad });
   const cont = document.getElementById('consignacionesList');
   cont.innerHTML = '';
   if (!res.consignaciones.length) {
-    cont.innerHTML = '<div class="empty-state">Aún no hay consignaciones reportadas</div>';
+    cont.innerHTML = '<div class="empty-state">Aún no has reportado consignaciones</div>';
     return;
   }
   res.consignaciones.slice().reverse().forEach(c => {
@@ -856,7 +594,6 @@ async function loadConsignacionesHistorial() {
     card.className = 'card';
     card.innerHTML = `
       <div class="row"><strong>Consignación #${escapeHtml(c['ID CONSIGNACIONES'])}</strong><span>$${formatMoney(c['VALOR CONSIGNADO'])}</span></div>
-      ${!esDistribuidor() ? '<div class="muted">Distribuidor: ' + escapeHtml(c['ID DISTRIBUIDOR']) + ' · ' + escapeHtml(c['CIUDAD']) + '</div>' : ''}
       <div class="muted">Remisiones: ${escapeHtml(c['REMISIONES QUE CONSIGNA'] || '-')}</div>
       <div class="muted">Fecha(s): ${escapeHtml(c['FECHAS DE ENTREGAS QUE CONSIGNA'] || '-')}</div>
     `;
@@ -864,7 +601,9 @@ async function loadConsignacionesHistorial() {
   });
 }
 
-document.getElementById('consFotoDrop').addEventListener('click', () => document.getElementById('consFotoInput').click());
+document.getElementById('consFotoDrop').addEventListener('click', () => {
+  document.getElementById('consFotoInput').click();
+});
 document.getElementById('consFotoInput').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
@@ -878,15 +617,22 @@ document.getElementById('btnEnviarConsignacion').addEventListener('click', async
   const checks = Array.from(document.querySelectorAll('#checklistRemisiones input:checked'));
   const valor = document.getElementById('consValor').value;
   const fechas = document.getElementById('consFechas').value;
+
   if (!checks.length) { toast('Selecciona al menos una remisión'); return; }
   if (!valor) { toast('Indica el valor consignado'); return; }
+
   const btn = document.getElementById('btnEnviarConsignacion');
   btn.innerHTML = '<span class="spinner"></span>Enviando...';
   try {
     await apiCall('addConsignacion', {
-      distribuidorId: session.id, ciudad: session.ciudad, fechas: fechas,
-      valorConsignado: Number(valor), fotoBase64: consFotoBase64,
-      remisiones: checks.map(c => c.dataset.remision), remisionRows: checks.map(c => Number(c.value)),
+      distribuidorId: session.id,
+      nombre: session.nombre,
+      ciudad: session.ciudad,
+      fechas: fechas,
+      valorConsignado: Number(valor),
+      fotoBase64: consFotoBase64,
+      remisiones: checks.map(c => c.dataset.remision),
+      remisionRows: checks.map(c => Number(c.value)),
       observaciones: document.getElementById('consObs').value
     });
     msgEl.textContent = 'Consignación registrada correctamente';
@@ -897,50 +643,32 @@ document.getElementById('btnEnviarConsignacion').addEventListener('click', async
     consFotoBase64 = null;
     document.getElementById('consFotoDrop').innerHTML = '📷 Toca para tomar/adjuntar foto';
     loadConsignarView();
-  } catch (e) { toast('Error: ' + e.message); }
-  finally { btn.innerHTML = 'Enviar consignación'; }
-});
-
-/* ---- Exportar Excel (Cartera / Administrador) ---- */
-document.getElementById('btnExportarExcel').addEventListener('click', async () => {
-  const desde = document.getElementById('exportDesde').value;
-  const hasta = document.getElementById('exportHasta').value;
-  if (!desde || !hasta) { toast('Selecciona el rango de fechas'); return; }
-  const btn = document.getElementById('btnExportarExcel');
-  btn.innerHTML = '<span class="spinner"></span>Generando...';
-  try {
-    const res = await apiCall('getRemisionesPorFecha', { desde, hasta });
-    if (!res.remisiones.length) { toast('No hay remisiones en ese rango'); return; }
-    const filas = res.remisiones.map(r => ({
-      ID: r['ID'], REMISION: r['REMISION'], FECHA: formatVal(r['FECHA']),
-      DISTRIBUIDOR: r['ID DISTRIBUIDOR'], CIUDAD: r['ID CIUDAD'], CLIENTE: r['NOMBRE'],
-      ESTADO: r['ESTADO'], 'VLR REMISION': r['VLR REMISION'], 'VLR CONSIGNADO': r['VLR CONSIGNADO'],
-      'FECHA CONSIGNACION': formatVal(r['FECHA CONSIGNACION']),
-      'CONFIRMADO CARTERA': r['CONFIRMADO CARTERA'] || ''
-    }));
-    const ws = XLSX.utils.json_to_sheet(filas);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Remisiones');
-    XLSX.writeFile(wb, `remisiones_${desde}_a_${hasta}.xlsx`);
-  } catch (e) { toast('Error: ' + e.message); }
-  finally { btn.innerHTML = '⬇ Descargar Excel'; }
+  } catch (e) {
+    toast('Error: ' + e.message);
+  } finally {
+    btn.innerHTML = 'Enviar consignación';
+  }
 });
 
 /* ======================================================================
  *  VISTA STOCK
  * ==================================================================== */
 async function loadStock() {
-  const res = await apiCall('getStock', { distribuidorId: session.id, nombre: session.nombre, ciudad: session.ciudad, verTodas: !!session.verTodas });
-  productHeadersCache = res.stock.map(p => p.producto);
+  const res = await apiCall('getStock', { distribuidorId: session.id, nombre: session.nombre, ciudad: session.ciudad });
   const cont = document.getElementById('stockCard');
   cont.innerHTML = '';
-  if (!res.stock.length) { cont.innerHTML = '<div class="empty-state">Sin datos de stock</div>'; return; }
+  if (!res.stock.length) {
+    cont.innerHTML = '<div class="empty-state">Sin datos de stock</div>';
+    return;
+  }
   res.stock.forEach(p => {
     const row = document.createElement('div');
     row.className = 'stock-row';
     row.innerHTML = `
-      <div><div><strong>${escapeHtml(p.producto)}</strong></div>
-      <div class="muted">Asignado: ${p.totalAsignado} · Entregado: ${p.totalEntregado}</div></div>
+      <div>
+        <div><strong>${escapeHtml(p.producto)}</strong></div>
+        <div class="muted">Asignado: ${p.totalAsignado} · Entregado: ${p.totalEntregado}</div>
+      </div>
       <div class="stock-num ${p.stock < 0 ? 'neg' : ''}">${p.stock}</div>
     `;
     cont.appendChild(row);
@@ -951,7 +679,7 @@ async function loadStock() {
  *  VISTA PENDIENTES
  * ==================================================================== */
 async function loadPendientes() {
-  const res = await apiCall('getPendientes', { distribuidorId: session.id, nombre: session.nombre, ciudad: session.ciudad, verTodas: !!session.verTodas });
+  const res = await apiCall('getPendientes', { distribuidorId: session.id, nombre: session.nombre, ciudad: session.ciudad });
 
   const contE = document.getElementById('pendEntregas');
   contE.innerHTML = '';
@@ -992,114 +720,7 @@ async function loadPendientes() {
     totalBox.innerHTML = `<span>Total por consignar</span><span>$${formatMoney(total)}</span>`;
     contC.appendChild(totalBox);
   }
-
-  const wrapCartera = document.getElementById('pendCarteraWrap');
-  if (puedeConfirmarCartera()) {
-    wrapCartera.style.display = 'block';
-    const contCartera = document.getElementById('pendCartera');
-    contCartera.innerHTML = '';
-    if (!res.pendientesConfirmacionCartera.length) {
-      contCartera.innerHTML = '<div class="empty-state">No hay pagos pendientes de confirmar</div>';
-    } else {
-      res.pendientesConfirmacionCartera.forEach(r => {
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.innerHTML = `
-          <div class="row"><strong>Remisión ${escapeHtml(r['REMISION'])}</strong><span>$${formatMoney(r['VLR CONSIGNADO'])}</span></div>
-          <div class="muted">Distribuidor: ${escapeHtml(r['ID DISTRIBUIDOR'])}</div>
-          <div class="cartera-check"><input type="checkbox"> <span>Confirmar pago visto en banco</span></div>
-        `;
-        const chk = card.querySelector('input');
-        chk.addEventListener('change', async () => {
-          try {
-            await apiCall('confirmarCartera', { row: r.__row, confirmado: chk.checked });
-            toast('Confirmado');
-            loadPendientes();
-          } catch (e) { toast('Error: ' + e.message); chk.checked = false; }
-        });
-        contCartera.appendChild(card);
-      });
-    }
-  } else {
-    wrapCartera.style.display = 'none';
-  }
 }
-
-/* ======================================================================
- *  VISTA ENTRADAS (Logística / Administrador)
- * ==================================================================== */
-async function loadEntradasView() {
-  const selDist = document.getElementById('entDistribuidor');
-  if (!selDist.dataset.loaded) {
-    const res = await apiCall('getDistribuidores', {});
-    selDist.innerHTML = '<option value="">Selecciona...</option>';
-    res.distribuidores.forEach(d => {
-      const opt = document.createElement('option');
-      opt.value = d.id;
-      opt.textContent = d.nombre;
-      opt.dataset.ciudades = JSON.stringify(d.ciudades);
-      selDist.appendChild(opt);
-    });
-    selDist.dataset.loaded = '1';
-    selDist.addEventListener('change', () => {
-      const opt = selDist.options[selDist.selectedIndex];
-      const ciudades = opt.dataset.ciudades ? JSON.parse(opt.dataset.ciudades) : [];
-      const selCiudad = document.getElementById('entCiudad');
-      selCiudad.innerHTML = '';
-      ciudades.forEach(c => {
-        const o = document.createElement('option');
-        o.value = c; o.textContent = c;
-        selCiudad.appendChild(o);
-      });
-    });
-  }
-
-  if (!document.getElementById('entFecha').value) {
-    document.getElementById('entFecha').value = new Date().toISOString().slice(0, 10);
-  }
-
-  if (!productHeadersCache.length) {
-    const res = await apiCall('getStock', { distribuidorId: '', nombre: '', ciudad: '', verTodas: true });
-    productHeadersCache = res.stock.map(p => p.producto);
-  }
-  const grid = document.getElementById('entProductGrid');
-  if (!grid.dataset.built) {
-    grid.innerHTML = '';
-    productHeadersCache.forEach(p => {
-      const div = document.createElement('div');
-      div.className = 'pfield';
-      div.innerHTML = `<label>${escapeHtml(p)}</label><input type="number" min="0" value="0" data-producto="${escapeHtml(p)}">`;
-      grid.appendChild(div);
-    });
-    grid.dataset.built = '1';
-  }
-}
-
-document.getElementById('btnGuardarEntrada').addEventListener('click', async () => {
-  const msgEl = document.getElementById('entMsg');
-  msgEl.style.display = 'none';
-  const distId = document.getElementById('entDistribuidor').value;
-  const ciudad = document.getElementById('entCiudad').value;
-  const fecha = document.getElementById('entFecha').value;
-  if (!distId || !ciudad) { toast('Selecciona distribuidor y ciudad'); return; }
-
-  const productos = {};
-  document.querySelectorAll('#entProductGrid input').forEach(inp => {
-    const v = Number(inp.value) || 0;
-    if (v > 0) productos[inp.dataset.producto] = v;
-  });
-  if (!Object.keys(productos).length) { toast('Ingresa al menos un producto'); return; }
-
-  const btn = document.getElementById('btnGuardarEntrada');
-  btn.innerHTML = '<span class="spinner"></span>Guardando...';
-  try {
-    await apiCall('addEntrada', { distribuidorId: distId, ciudad, fecha, productos });
-    msgEl.textContent = 'Entrada registrada correctamente';
-    msgEl.style.display = 'block';
-    document.querySelectorAll('#entProductGrid input').forEach(inp => inp.value = 0);
-  } catch (e) { toast('Error: ' + e.message); }
-  finally { btn.innerHTML = 'Guardar entrada'; }
-});
 
 /* ======================================================================
  *  UTILIDADES
@@ -1108,10 +729,14 @@ function escapeHtml(v) {
   if (v === null || v === undefined) return '';
   return String(v).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
 }
-function formatMoney(v) { const n = Number(v) || 0; return n.toLocaleString('es-CO'); }
+function formatMoney(v) {
+  const n = Number(v) || 0;
+  return n.toLocaleString('es-CO');
+}
 function formatVal(v) {
   if (!v) return '-';
   if (v instanceof Date) return v.toLocaleDateString('es-CO');
+  // Apps Script a veces envía fechas como string ISO
   const d = new Date(v);
   if (!isNaN(d.getTime()) && String(v).length > 8) return d.toLocaleDateString('es-CO');
   return String(v);
@@ -1121,7 +746,9 @@ function formatVal(v) {
  *  REGISTRO DEL SERVICE WORKER (PWA instalable)
  * ==================================================================== */
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
 }
 </script>
 </body>
