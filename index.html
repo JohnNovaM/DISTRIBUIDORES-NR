@@ -3,21 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>App Distribuidores</title>
+<title>Natural Resvex - Distribuidores</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#1e6b52">
+<meta name="theme-color" content="#2c6699">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
-    --primary:#1e6b52;
-    --primary-dark:#154b3a;
+    --primary:#2c6699;
+    --primary-dark:#194873;
+    --accent-green:#5b9a26;
     --bg:#f4f6f5;
     --card:#ffffff;
     --text:#1c2a26;
     --muted:#6b7a75;
     --danger:#c0392b;
     --warning:#c98a12;
-    --ok:#1e6b52;
+    --ok:#5b9a26;
     --border:#e1e6e4;
     --radius:14px;
   }
@@ -33,9 +34,11 @@
 
   /* ---- Login ---- */
   #login-screen{justify-content:center;align-items:center;padding:24px;min-height:100vh;}
-  .login-box{width:100%;max-width:360px;background:var(--card);border-radius:20px;padding:32px 24px;box-shadow:0 8px 30px rgba(0,0,0,.08);}
+  .login-box{width:100%;max-width:360px;background:var(--card);border-radius:20px;padding:32px 24px;box-shadow:0 8px 30px rgba(0,0,0,.08);text-align:center;}
+  .login-box .logo{width:110px;height:auto;margin:0 auto 14px;display:block;}
   .login-box h1{font-size:22px;margin:0 0 4px;color:var(--primary-dark);}
   .login-box p.sub{color:var(--muted);margin:0 0 24px;font-size:14px;}
+  .login-box label, .login-box input{text-align:left;}
   label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin:14px 0 6px;}
   input[type=text],input[type=email],input[type=password],input[type=date],input[type=number],textarea,select{
     width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:10px;font-size:15px;background:#fff;color:var(--text);
@@ -175,7 +178,8 @@
   <!-- ===================== LOGIN ===================== -->
   <section id="login-screen" class="screen active">
     <div class="login-box">
-      <h1>Distribuidores</h1>
+      <img src="logo.png" alt="Natural Resvex" class="logo">
+      <h1>Natural Resvex</h1>
       <p class="sub">Ingresa con tu correo y contraseña</p>
       <label>Correo</label>
       <input type="email" id="loginCorreo" placeholder="correo@ejemplo.com" autocomplete="username">

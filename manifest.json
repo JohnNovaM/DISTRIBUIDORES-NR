@@ -1,10 +1,10 @@
 {
-  "name": "App Distribuidores",
-  "short_name": "Distribuidores",
+  "name": "Natural Resvex - Distribuidores",
+  "short_name": "Natural Resvex",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f4f6f5",
-  "theme_color": "#1e6b52",
+  "theme_color": "#2c6699",
   "icons": [
     {
       "src": "icon-192.png",
