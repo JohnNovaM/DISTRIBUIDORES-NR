@@ -94,6 +94,10 @@
     color:var(--muted);cursor:pointer;white-space:nowrap;background:#fff;
   }
   .city-chip.active{background:var(--primary);border-color:var(--primary);color:#fff;}
+  #buscadorRemision{margin:6px 0 10px;}
+  #estadoFilterBar{overflow-x:auto;background:transparent;border:none;margin-bottom:8px;padding-left:0;padding-right:0;}
+  .date-group-header{display:flex;justify-content:space-between;align-items:center;background:#eef3f1;border-radius:10px;padding:8px 12px;margin:14px 0 8px;font-size:12.5px;font-weight:700;color:var(--primary-dark);}
+  .grand-total-box{background:var(--primary);color:#fff;border-radius:12px;padding:14px;margin-top:6px;margin-bottom:12px;display:flex;justify-content:space-between;font-weight:700;font-size:13.5px;}
 
   /* ---- Contenido ---- */
   main{padding:14px 16px;flex:1;}
@@ -228,13 +232,20 @@
 
     <main id="viewRemisiones" class="view">
       <div class="section-title">
-        <span id="tituloRemisiones">Remisiones pendientes</span>
+        <span id="tituloRemisiones">Remisiones</span>
         <button class="small-btn" id="btnNuevaRemision" style="display:none;">+ Nueva</button>
       </div>
-      <div class="toggle-row" id="toggleSoloPendientesRow" style="display:none;">
-        <input type="checkbox" id="toggleSoloPendientes"> <label style="margin:0;font-weight:500;" for="toggleSoloPendientes">Ver solo pendientes</label>
-      </div>
+      <input type="text" id="buscadorRemision" placeholder="🔍 Buscar por número de remisión...">
+      <div class="city-filter-bar" id="estadoFilterBar" style="padding-left:0;padding-right:0;"></div>
+      <div id="remisionesTotales"></div>
       <div id="remisionesList"></div>
+
+      <div class="section-title" style="margin-top:22px;">Exportar Excel por fecha</div>
+      <label>Desde</label>
+      <input type="date" id="remExportDesde">
+      <label>Hasta</label>
+      <input type="date" id="remExportHasta">
+      <button class="secondary" id="btnExportarRemisionesExcel">⬇ Descargar Excel</button>
     </main>
 
     <main id="viewConsignar" class="view" style="display:none;">
@@ -325,6 +336,23 @@
 
     <label>Fecha de entrega</label>
     <input type="date" id="modalFecha">
+
+    <label>Forma de pago</label>
+    <select id="modalFormaPago">
+      <option value="">Selecciona...</option>
+      <option value="EFECTIVO">EFECTIVO</option>
+      <option value="DATAFONO">DATAFONO</option>
+      <option value="NEQUI">NEQUI</option>
+      <option value="DAVIPLATA">DAVIPLATA</option>
+      <option value="CONSIGNACIÓN">CONSIGNACIÓN</option>
+      <option value="WOMPI">WOMPI</option>
+      <option value="CAIDA">CAIDA</option>
+      <option value="REPROGRAMADA">REPROGRAMADA</option>
+      <option value="CAMBIO">CAMBIO</option>
+    </select>
+
+    <label>Valor desplazamiento</label>
+    <input type="number" id="modalValorDesplazamiento" placeholder="0" min="0">
 
     <label>Observación</label>
     <textarea id="modalObs" placeholder="Escribe una observación..."></textarea>
@@ -552,8 +580,6 @@ async function startApp() {
   }
 
   document.getElementById('btnNuevaRemision').style.display = puedeCrearRemision() ? 'inline-block' : 'none';
-  document.getElementById('toggleSoloPendientesRow').style.display = session.verTodas ? 'flex' : 'none';
-  document.getElementById('toggleSoloPendientes').checked = !session.verTodas;
 
   document.getElementById('consignarFormWrap').style.display = puedeCrearConsignacion() ? 'block' : 'none';
   document.getElementById('exportExcelWrap').style.display = puedeExportarExcel() ? 'block' : 'none';
@@ -646,7 +672,7 @@ function selectCiudadFiltro(ciudad, chipEl) {
  * ==================================================================== */
 document.getElementById('btnRefresh').addEventListener('click', refreshCurrentView);
 document.getElementById('intervalSelect').addEventListener('change', (e) => startAutoRefresh(Number(e.target.value)));
-document.getElementById('toggleSoloPendientes').addEventListener('change', loadRemisiones);
+document.getElementById('buscadorRemision').addEventListener('input', renderRemisiones);
 
 function startAutoRefresh(ms) {
   stopAutoRefresh();
@@ -678,81 +704,162 @@ async function refreshCurrentView(silent) {
 /* ======================================================================
  *  VISTA REMISIONES
  * ==================================================================== */
-async function loadRemisiones() {
-  const cont = document.getElementById('remisionesList');
-  const soloPendientes = document.getElementById('toggleSoloPendientes').checked;
-  document.getElementById('tituloRemisiones').textContent = soloPendientes ? 'Remisiones pendientes' : 'Todas las remisiones';
+let remisionesCache = [];
+let estadoFiltroActual = 'PENDIENTE';
+const ESTADO_FILTROS = [
+  { key: 'PENDIENTE', label: 'Pendientes' },
+  { key: 'ENTREGADO', label: 'Entregadas' },
+  { key: 'REPROGRAMADO', label: 'Reprogramadas' },
+  { key: 'CAIDO', label: 'Caídas' },
+  { key: 'TODAS', label: 'Todas' }
+];
 
+function estadoKey(estadoRaw) {
+  const e = String(estadoRaw || '').trim().toUpperCase();
+  if (!e) return 'PENDIENTE';
+  if (e === 'ENTREGADO') return 'ENTREGADO';
+  if (e === 'REPROGRAMADO') return 'REPROGRAMADO';
+  if (e === 'CAÍDO' || e === 'CAIDO') return 'CAIDO';
+  return 'PENDIENTE';
+}
+
+function renderEstadoFilterBar() {
+  const bar = document.getElementById('estadoFilterBar');
+  bar.innerHTML = '';
+  ESTADO_FILTROS.forEach(f => {
+    const chip = document.createElement('div');
+    chip.className = 'city-chip' + (estadoFiltroActual === f.key ? ' active' : '');
+    chip.textContent = f.label;
+    chip.onclick = () => {
+      estadoFiltroActual = f.key;
+      document.querySelectorAll('#estadoFilterBar .city-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      renderRemisiones();
+    };
+    bar.appendChild(chip);
+  });
+}
+
+async function loadRemisiones() {
   const res = await apiCall('getRemisiones', {
     distribuidorId: session.id, nombre: session.nombre, ciudad: session.ciudad,
-    verTodas: !!session.verTodas, soloPendientes: soloPendientes
+    verTodas: !!session.verTodas, soloPendientes: false
   });
+  remisionesCache = res.remisiones;
+  if (!document.getElementById('estadoFilterBar').dataset.built) {
+    renderEstadoFilterBar();
+    document.getElementById('estadoFilterBar').dataset.built = '1';
+  }
+  renderRemisiones();
+}
+
+function renderRemisiones() {
+  const cont = document.getElementById('remisionesList');
+  const totalesCont = document.getElementById('remisionesTotales');
+  const busqueda = document.getElementById('buscadorRemision').value.trim().toLowerCase();
   cont.innerHTML = '';
-  if (!res.remisiones.length) {
+  totalesCont.innerHTML = '';
+
+  let filtradas = remisionesCache.filter(r => estadoFiltroActual === 'TODAS' || estadoKey(r['ESTADO']) === estadoFiltroActual);
+  if (busqueda) {
+    filtradas = filtradas.filter(r => String(r['REMISION'] || '').toLowerCase().includes(busqueda));
+  }
+
+  if (!filtradas.length) {
     cont.innerHTML = '<div class="empty-state">🎉 No hay remisiones para mostrar</div>';
     return;
   }
-  res.remisiones.forEach(r => {
-    const estado = String(r['ESTADO'] || '').trim();
-    const badgeClass = estado ? (estado.toLowerCase() === 'entregado' ? 'entregado' : estado.toLowerCase() === 'caído' || estado.toLowerCase() === 'caido' ? 'caido' : 'reprogramado') : 'pendiente';
-    const card = document.createElement('div');
-    card.className = 'card';
-    let extra = '';
-    if (!esDistribuidor()) {
-      extra += '<div class="muted">Distribuidor: ' + escapeHtml(r['ID DISTRIBUIDOR']) + ' · Ciudad: ' + escapeHtml(r['ID CIUDAD']) + '</div>';
-      extra += '<div class="muted">Cliente: ' + escapeHtml(r['NOMBRE']) + '</div>';
-    }
-    let botones = '<div class="actions-row"></div>';
-    card.innerHTML = `
-      <div class="row"><strong>Remisión ${escapeHtml(r['REMISION'])}</strong><span class="badge ${badgeClass}">${estado || 'Pendiente'}</span></div>
-      ${extra}
-      <div class="muted">Fecha: ${escapeHtml(formatVal(r['FECHA']))}</div>
-      <div class="muted">Valor: $${formatMoney(r['VLR REMISION'])}</div>
-      ${botones}
-    `;
-    const actionsRow = card.querySelector('.actions-row');
 
-    if (esDistribuidor()) {
-      card.style.cursor = 'pointer';
-      card.addEventListener('click', () => openModalRemision(r));
-    }
+  // Para "Entregadas" agrupamos por fecha de entrega y sumamos el valor de desplazamiento
+  if (estadoFiltroActual === 'ENTREGADO') {
+    const grupos = {};
+    filtradas.forEach(r => {
+      const fecha = formatVal(r['FECHA ENTREGA'] || r['FECHA']);
+      if (!grupos[fecha]) grupos[fecha] = [];
+      grupos[fecha].push(r);
+    });
+    const fechasOrdenadas = Object.keys(grupos).sort().reverse();
+    let granTotal = 0;
+    fechasOrdenadas.forEach(fecha => {
+      const items = grupos[fecha];
+      let subtotal = 0;
+      items.forEach(r => { subtotal += Number(r['VLR DESPLAZAMIENTO'] || r['VALOR DESPLAZAMIENTO']) || 0; });
+      granTotal += subtotal;
+      const header = document.createElement('div');
+      header.className = 'date-group-header';
+      header.innerHTML = `<span>${escapeHtml(fecha)} · ${items.length} remisión(es)</span><span>Desplaz: $${formatMoney(subtotal)}</span>`;
+      cont.appendChild(header);
+      items.forEach(r => cont.appendChild(renderRemisionCard(r)));
+    });
+    const totalBox = document.createElement('div');
+    totalBox.className = 'grand-total-box';
+    totalBox.innerHTML = `<span>Total desplazamiento</span><span>$${formatMoney(granTotal)}</span>`;
+    totalesCont.appendChild(totalBox);
+  } else {
+    filtradas.forEach(r => cont.appendChild(renderRemisionCard(r)));
+  }
+}
 
-    if (puedeGenerarPDF()) {
-      const btnPdf = document.createElement('button');
-      btnPdf.className = 'small-btn outline';
-      btnPdf.textContent = r['PDF REMISION'] ? '📄 Ver PDF' : '📄 Generar PDF';
-      btnPdf.onclick = async (ev) => {
-        ev.stopPropagation();
-        if (r['PDF REMISION']) { window.open(r['PDF REMISION'], '_blank'); return; }
-        btnPdf.innerHTML = '<span class="spinner"></span>';
-        try {
-          const res2 = await apiCall('generarPDF', { row: r.__row });
-          window.open(res2.url, '_blank');
-          toast('PDF generado');
-          loadRemisiones();
-        } catch (e) { toast('Error: ' + e.message); btnPdf.textContent = '📄 Generar PDF'; }
-      };
-      actionsRow.appendChild(btnPdf);
-    }
+function renderRemisionCard(r) {
+  const estado = String(r['ESTADO'] || '').trim();
+  const badgeClass = estado ? (estado.toLowerCase() === 'entregado' ? 'entregado' : estado.toLowerCase() === 'caído' || estado.toLowerCase() === 'caido' ? 'caido' : 'reprogramado') : 'pendiente';
+  const card = document.createElement('div');
+  card.className = 'card';
+  let extra = '';
+  if (!esDistribuidor()) {
+    extra += '<div class="muted">Distribuidor: ' + escapeHtml(r['ID DISTRIBUIDOR']) + ' · Ciudad: ' + escapeHtml(r['ID CIUDAD']) + '</div>';
+    extra += '<div class="muted">Cliente: ' + escapeHtml(r['NOMBRE']) + '</div>';
+  }
+  card.innerHTML = `
+    <div class="row"><strong>Remisión ${escapeHtml(r['REMISION'])}</strong><span class="badge ${badgeClass}">${estado || 'Pendiente'}</span></div>
+    ${extra}
+    <div class="muted">Fecha: ${escapeHtml(formatVal(r['FECHA']))}</div>
+    <div class="muted">Valor: $${formatMoney(r['VLR REMISION'])}</div>
+    ${estado ? '<div class="muted">Pago: ' + escapeHtml(r['FORMA DE PAGO'] || '-') + ' · Desplaz: $' + formatMoney(r['VLR DESPLAZAMIENTO'] || r['VALOR DESPLAZAMIENTO']) + '</div>' : ''}
+    <div class="actions-row"></div>
+  `;
+  const actionsRow = card.querySelector('.actions-row');
 
-    if (puedeConfirmarCartera() && estado.toLowerCase() === 'entregado') {
-      const wrap = document.createElement('div');
-      wrap.className = 'cartera-check';
-      const confirmado = String(r['CONFIRMADO CARTERA'] || '').trim().toUpperCase() === 'SI';
-      wrap.innerHTML = `<input type="checkbox" ${confirmado ? 'checked' : ''}> <span>Pago confirmado por Cartera</span>`;
-      const chk = wrap.querySelector('input');
-      chk.addEventListener('click', (ev) => ev.stopPropagation());
-      chk.addEventListener('change', async () => {
-        try {
-          await apiCall('confirmarCartera', { row: r.__row, confirmado: chk.checked });
-          toast('Actualizado');
-        } catch (e) { toast('Error: ' + e.message); chk.checked = !chk.checked; }
-      });
-      card.appendChild(wrap);
-    }
+  if (esDistribuidor()) {
+    card.style.cursor = 'pointer';
+    card.addEventListener('click', () => openModalRemision(r));
+  }
 
-    cont.appendChild(card);
-  });
+  if (puedeGenerarPDF()) {
+    const btnPdf = document.createElement('button');
+    btnPdf.className = 'small-btn outline';
+    btnPdf.textContent = r['PDF REMISION'] ? '📄 Ver PDF' : '📄 Generar PDF';
+    btnPdf.onclick = async (ev) => {
+      ev.stopPropagation();
+      if (r['PDF REMISION']) { window.open(r['PDF REMISION'], '_blank'); return; }
+      btnPdf.innerHTML = '<span class="spinner"></span>';
+      try {
+        const res2 = await apiCall('generarPDF', { row: r.__row });
+        window.open(res2.url, '_blank');
+        toast('PDF generado');
+        loadRemisiones();
+      } catch (e) { toast('Error: ' + e.message); btnPdf.textContent = '📄 Generar PDF'; }
+    };
+    actionsRow.appendChild(btnPdf);
+  }
+
+  if (puedeConfirmarCartera() && estado.toLowerCase() === 'entregado') {
+    const wrap = document.createElement('div');
+    wrap.className = 'cartera-check';
+    const confirmado = String(r['CONFIRMADO CARTERA'] || '').trim().toUpperCase() === 'SI';
+    wrap.innerHTML = `<input type="checkbox" ${confirmado ? 'checked' : ''}> <span>Pago confirmado por Cartera</span>`;
+    const chk = wrap.querySelector('input');
+    chk.addEventListener('click', (ev) => ev.stopPropagation());
+    chk.addEventListener('change', async () => {
+      try {
+        await apiCall('confirmarCartera', { row: r.__row, confirmado: chk.checked });
+        toast('Actualizado');
+      } catch (e) { toast('Error: ' + e.message); chk.checked = !chk.checked; }
+    });
+    card.appendChild(wrap);
+  }
+
+  return card;
 }
 
 function openModalRemision(r) {
@@ -760,10 +867,21 @@ function openModalRemision(r) {
   modalFotoBase64 = null;
   document.getElementById('modalTitle').textContent = 'Remisión ' + r['REMISION'];
   document.getElementById('modalSub').textContent = 'Valor: $' + formatMoney(r['VLR REMISION']);
+
+  // Precarga lo que ya estaba guardado, por si viene a corregir un registro anterior
   document.querySelectorAll('.chip-select .chip').forEach(c => c.classList.remove('active'));
-  document.getElementById('modalFecha').value = '';
-  document.getElementById('modalObs').value = '';
-  document.getElementById('modalFotoDrop').innerHTML = '📷 Toca para tomar/adjuntar foto';
+  const estadoActual = String(r['ESTADO'] || '').trim().toLowerCase();
+  document.querySelectorAll('.chip-select .chip').forEach(c => {
+    if (c.dataset.estado.toLowerCase() === estadoActual) c.classList.add('active');
+  });
+  const fechaExistente = r['FECHA ENTREGA'];
+  document.getElementById('modalFecha').value = fechaExistente ? String(formatValISO(fechaExistente)) : '';
+  document.getElementById('modalFormaPago').value = r['FORMA DE PAGO'] || '';
+  document.getElementById('modalValorDesplazamiento').value = Number(r['VLR DESPLAZAMIENTO'] || r['VALOR DESPLAZAMIENTO']) || '';
+  document.getElementById('modalObs').value = r['OBSERVACIONES'] || '';
+  document.getElementById('modalFotoDrop').innerHTML = r['COMPROBANTE']
+    ? `✅ Ya tiene foto — toca para reemplazarla`
+    : '📷 Toca para tomar/adjuntar foto';
   document.getElementById('modalError').style.display = 'none';
   document.getElementById('modalOverlay').classList.add('active');
 }
@@ -794,6 +912,8 @@ document.getElementById('btnGuardarRemision').addEventListener('click', async ()
       row: selectedRemision.__row, estado: estadoChip.dataset.estado,
       fechaEntrega: document.getElementById('modalFecha').value,
       observacion: document.getElementById('modalObs').value,
+      formaPago: document.getElementById('modalFormaPago').value,
+      valorDesplazamiento: document.getElementById('modalValorDesplazamiento').value,
       fotoBase64: modalFotoBase64
     });
     document.getElementById('modalOverlay').classList.remove('active');
@@ -801,6 +921,34 @@ document.getElementById('btnGuardarRemision').addEventListener('click', async ()
     loadRemisiones();
   } catch (e) { errEl.textContent = e.message; errEl.style.display = 'block'; }
   finally { btn.innerHTML = 'Guardar'; }
+});
+
+document.getElementById('btnExportarRemisionesExcel').addEventListener('click', async () => {
+  const desde = document.getElementById('remExportDesde').value;
+  const hasta = document.getElementById('remExportHasta').value;
+  if (!desde || !hasta) { toast('Selecciona el rango de fechas'); return; }
+  const btn = document.getElementById('btnExportarRemisionesExcel');
+  btn.innerHTML = '<span class="spinner"></span>Generando...';
+  try {
+    const res = await apiCall('getRemisionesPorFecha', {
+      desde, hasta, distribuidorId: session.id, nombre: session.nombre,
+      ciudad: session.ciudad, verTodas: !!session.verTodas
+    });
+    if (!res.remisiones.length) { toast('No hay remisiones en ese rango'); return; }
+    const filas = res.remisiones.map(r => ({
+      ID: r['ID GESTION'] || r['ID'], REMISION: r['REMISION'], FECHA: formatVal(r['FECHA']),
+      DISTRIBUIDOR: r['ID DISTRIBUIDOR'], CIUDAD: r['ID CIUDAD'], CLIENTE: r['NOMBRE'],
+      ESTADO: r['ESTADO'], 'FORMA DE PAGO': r['FORMA DE PAGO'],
+      'VLR REMISION': r['VLR REMISION'], 'VLR DESPLAZAMIENTO': r['VLR DESPLAZAMIENTO'] || r['VALOR DESPLAZAMIENTO'],
+      'VLR CONSIGNADO': r['VLR CONSIGNADO'], 'FECHA CONSIGNACION': formatVal(r['FECHA CONSIGNACION']),
+      'CONFIRMADO CARTERA': r['CONFIRMADO CARTERA'] || ''
+    }));
+    const ws = XLSX.utils.json_to_sheet(filas);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Remisiones');
+    XLSX.writeFile(wb, `remisiones_${desde}_a_${hasta}.xlsx`);
+  } catch (e) { toast('Error: ' + e.message); }
+  finally { btn.innerHTML = '⬇ Descargar Excel'; }
 });
 
 /* ---- Crear remisión (Logística / Administrador) ---- */
@@ -918,7 +1066,10 @@ document.getElementById('btnExportarExcel').addEventListener('click', async () =
   const btn = document.getElementById('btnExportarExcel');
   btn.innerHTML = '<span class="spinner"></span>Generando...';
   try {
-    const res = await apiCall('getRemisionesPorFecha', { desde, hasta });
+    const res = await apiCall('getRemisionesPorFecha', {
+      desde, hasta, distribuidorId: session.id, nombre: session.nombre,
+      ciudad: session.ciudad, verTodas: !!session.verTodas
+    });
     if (!res.remisiones.length) { toast('No hay remisiones en ese rango'); return; }
     const filas = res.remisiones.map(r => ({
       ID: r['ID'], REMISION: r['REMISION'], FECHA: formatVal(r['FECHA']),
@@ -1124,6 +1275,13 @@ function formatVal(v) {
   const d = new Date(v);
   if (!isNaN(d.getTime()) && String(v).length > 8) return d.toLocaleDateString('es-CO');
   return String(v);
+}
+function formatValISO(v) {
+  if (!v) return '';
+  const d = (v instanceof Date) ? v : new Date(v);
+  if (isNaN(d.getTime())) return '';
+  const pad = n => String(n).padStart(2, '0');
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
 }
 
 /* ======================================================================
