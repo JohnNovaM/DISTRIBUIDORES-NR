@@ -233,7 +233,6 @@
     <main id="viewRemisiones" class="view">
       <div class="section-title">
         <span id="tituloRemisiones">Remisiones</span>
-        <button class="small-btn" id="btnNuevaRemision" style="display:none;">+ Nueva</button>
       </div>
       <input type="text" id="buscadorRemision" placeholder="🔍 Buscar por número de remisión...">
       <div class="city-filter-bar" id="estadoFilterBar" style="padding-left:0;padding-right:0;"></div>
@@ -327,17 +326,17 @@
     </div>
     <p class="muted" id="modalSub"></p>
 
-    <label>Estado</label>
+    <label>Estado *</label>
     <div class="chip-select">
       <div class="chip sel-entregado" data-estado="Entregado">Entregado</div>
       <div class="chip sel-caido" data-estado="Caído">Caído</div>
       <div class="chip sel-reprogramado" data-estado="Reprogramado">Reprogramado</div>
     </div>
 
-    <label>Fecha de entrega</label>
+    <label>Fecha de entrega *</label>
     <input type="date" id="modalFecha">
 
-    <label>Forma de pago</label>
+    <label>Forma de pago *</label>
     <select id="modalFormaPago">
       <option value="">Selecciona...</option>
       <option value="EFECTIVO">EFECTIVO</option>
@@ -351,7 +350,7 @@
       <option value="CAMBIO">CAMBIO</option>
     </select>
 
-    <label>Valor desplazamiento</label>
+    <label>Valor desplazamiento *</label>
     <input type="number" id="modalValorDesplazamiento" placeholder="0" min="0">
 
     <label>Observación</label>
@@ -363,22 +362,6 @@
 
     <button class="primary" id="btnGuardarRemision">Guardar</button>
     <p class="error-msg" id="modalError"></p>
-  </div>
-</div>
-
-<!-- ===================== MODAL NUEVA REMISIÓN (Logística/Administrador) ===================== -->
-<div class="modal-overlay" id="modalNuevaOverlay">
-  <div class="modal">
-    <div class="modal-header">
-      <h2>Nueva remisión</h2>
-      <button class="close-x" id="modalNuevaClose">✕</button>
-    </div>
-    <p class="muted">Solo escribe el número de remisión — el distribuidor, cliente y productos se completan automáticamente desde tu hoja de ventas.</p>
-    <label>Número de remisión</label>
-    <input type="text" id="nuevaRemisionNum" placeholder="Ej: 10234">
-    <button class="primary" id="btnCrearRemision">Crear</button>
-    <p class="error-msg" id="nuevaRemisionError"></p>
-    <p class="success-msg" id="nuevaRemisionMsg"></p>
   </div>
 </div>
 
@@ -424,7 +407,6 @@ let productHeadersCache = [];
 function rolUpper() { return session && session.rol ? String(session.rol).toUpperCase() : 'DISTRIBUIDOR'; }
 function esDistribuidor() { return rolUpper() === 'DISTRIBUIDOR'; }
 function esGerencia() { return rolUpper() === 'GERENCIA'; }
-function puedeCrearRemision() { return ['ADMINISTRADOR', 'LOGISTICA'].indexOf(rolUpper()) !== -1; }
 function puedeGenerarPDF() { return ['ADMINISTRADOR', 'LOGISTICA'].indexOf(rolUpper()) !== -1; }
 function puedeConfirmarCartera() { return ['ADMINISTRADOR', 'CARTERA'].indexOf(rolUpper()) !== -1; }
 function puedeExportarExcel() { return ['ADMINISTRADOR', 'CARTERA'].indexOf(rolUpper()) !== -1; }
@@ -578,8 +560,6 @@ async function startApp() {
   } else {
     document.getElementById('cityFilterBar').style.display = 'none';
   }
-
-  document.getElementById('btnNuevaRemision').style.display = puedeCrearRemision() ? 'inline-block' : 'none';
 
   document.getElementById('consignarFormWrap').style.display = puedeCrearConsignacion() ? 'block' : 'none';
   document.getElementById('exportExcelWrap').style.display = puedeExportarExcel() ? 'block' : 'none';
@@ -770,33 +750,85 @@ function renderRemisiones() {
     return;
   }
 
-  // Para "Entregadas" agrupamos por fecha de entrega y sumamos el valor de desplazamiento
+  // Gerencia / Administrador / Logística / Cartera: agrupamos por distribuidor
+  // (en vez de por ciudad) para que cada quien vea de un vistazo todas sus
+  // remisiones juntas, sin importar cuántas ciudades esté mirando a la vez.
+  if (!esDistribuidor()) {
+    renderRemisionesPorDistribuidor(filtradas, cont, totalesCont);
+    return;
+  }
+
+  // Distribuidor: para "Entregadas" agrupamos por fecha de entrega y
+  // sumamos el valor de desplazamiento (comportamiento original).
   if (estadoFiltroActual === 'ENTREGADO') {
-    const grupos = {};
-    filtradas.forEach(r => {
-      const fecha = formatVal(r['FECHA ENTREGA'] || r['FECHA']);
-      if (!grupos[fecha]) grupos[fecha] = [];
-      grupos[fecha].push(r);
-    });
-    const fechasOrdenadas = Object.keys(grupos).sort().reverse();
-    let granTotal = 0;
-    fechasOrdenadas.forEach(fecha => {
-      const items = grupos[fecha];
-      let subtotal = 0;
-      items.forEach(r => { subtotal += Number(r['VLR DESPLAZAMIENTO'] || r['VALOR DESPLAZAMIENTO']) || 0; });
-      granTotal += subtotal;
-      const header = document.createElement('div');
-      header.className = 'date-group-header';
-      header.innerHTML = `<span>${escapeHtml(fecha)} · ${items.length} remisión(es)</span><span>Desplaz: $${formatMoney(subtotal)}</span>`;
-      cont.appendChild(header);
-      items.forEach(r => cont.appendChild(renderRemisionCard(r)));
-    });
-    const totalBox = document.createElement('div');
-    totalBox.className = 'grand-total-box';
-    totalBox.innerHTML = `<span>Total desplazamiento</span><span>$${formatMoney(granTotal)}</span>`;
-    totalesCont.appendChild(totalBox);
+    renderRemisionesPorFechaEntrega(filtradas, cont, totalesCont);
   } else {
     filtradas.forEach(r => cont.appendChild(renderRemisionCard(r)));
+  }
+}
+
+// Agrupa remisiones por fecha de entrega (usado en la vista del Distribuidor
+// cuando el filtro de estado es "Entregadas").
+function renderRemisionesPorFechaEntrega(items, cont, totalesCont) {
+  const grupos = {};
+  items.forEach(r => {
+    const fecha = formatVal(r['FECHA ENTREGA'] || r['FECHA']);
+    if (!grupos[fecha]) grupos[fecha] = [];
+    grupos[fecha].push(r);
+  });
+  const fechasOrdenadas = Object.keys(grupos).sort().reverse();
+  let granTotal = 0;
+  fechasOrdenadas.forEach(fecha => {
+    const grupoItems = grupos[fecha];
+    let subtotal = 0;
+    grupoItems.forEach(r => { subtotal += Number(r['VLR DESPLAZAMIENTO'] || r['VALOR DESPLAZAMIENTO']) || 0; });
+    granTotal += subtotal;
+    const header = document.createElement('div');
+    header.className = 'date-group-header';
+    header.innerHTML = `<span>${escapeHtml(fecha)} · ${grupoItems.length} remisión(es)</span><span>Desplaz: $${formatMoney(subtotal)}</span>`;
+    cont.appendChild(header);
+    grupoItems.forEach(r => cont.appendChild(renderRemisionCard(r)));
+  });
+  const totalBox = document.createElement('div');
+  totalBox.className = 'grand-total-box';
+  totalBox.innerHTML = `<span>Total desplazamiento</span><span>$${formatMoney(granTotal)}</span>`;
+  totalesCont.appendChild(totalBox);
+}
+
+// Agrupa remisiones por distribuidor (usado en la vista de Gerencia,
+// Administrador, Logística y Cartera). Si el filtro de estado es
+// "Entregadas", además suma el desplazamiento por cada distribuidor.
+function renderRemisionesPorDistribuidor(items, cont, totalesCont) {
+  const grupos = {};
+  items.forEach(r => {
+    const dist = String(r['ID DISTRIBUIDOR'] || '').trim() || 'Sin distribuidor';
+    if (!grupos[dist]) grupos[dist] = [];
+    grupos[dist].push(r);
+  });
+  const distribuidoresOrdenados = Object.keys(grupos).sort((a, b) => a.localeCompare(b, 'es'));
+  let granTotalDesplaz = 0;
+
+  distribuidoresOrdenados.forEach(dist => {
+    const grupoItems = grupos[dist];
+    const header = document.createElement('div');
+    header.className = 'date-group-header';
+    if (estadoFiltroActual === 'ENTREGADO') {
+      let subtotal = 0;
+      grupoItems.forEach(r => { subtotal += Number(r['VLR DESPLAZAMIENTO'] || r['VALOR DESPLAZAMIENTO']) || 0; });
+      granTotalDesplaz += subtotal;
+      header.innerHTML = `<span>👤 ${escapeHtml(dist)} · ${grupoItems.length} remisión(es)</span><span>Desplaz: $${formatMoney(subtotal)}</span>`;
+    } else {
+      header.innerHTML = `<span>👤 ${escapeHtml(dist)}</span><span>${grupoItems.length} remisión(es)</span>`;
+    }
+    cont.appendChild(header);
+    grupoItems.forEach(r => cont.appendChild(renderRemisionCard(r)));
+  });
+
+  if (estadoFiltroActual === 'ENTREGADO') {
+    const totalBox = document.createElement('div');
+    totalBox.className = 'grand-total-box';
+    totalBox.innerHTML = `<span>Total desplazamiento</span><span>$${formatMoney(granTotalDesplaz)}</span>`;
+    totalesCont.appendChild(totalBox);
   }
 }
 
@@ -807,7 +839,7 @@ function renderRemisionCard(r) {
   card.className = 'card';
   let extra = '';
   if (!esDistribuidor()) {
-    extra += '<div class="muted">Distribuidor: ' + escapeHtml(r['ID DISTRIBUIDOR']) + ' · Ciudad: ' + escapeHtml(r['ID CIUDAD']) + '</div>';
+    extra += '<div class="muted">Ciudad: ' + escapeHtml(r['ID CIUDAD']) + '</div>';
     extra += '<div class="muted">Cliente: ' + escapeHtml(r['NOMBRE']) + '</div>';
   }
   card.innerHTML = `
@@ -904,16 +936,30 @@ document.getElementById('btnGuardarRemision').addEventListener('click', async ()
   const estadoChip = document.querySelector('.chip-select .chip.active');
   const errEl = document.getElementById('modalError');
   errEl.style.display = 'none';
+
+  const fechaEntrega = document.getElementById('modalFecha').value;
+  const formaPago = document.getElementById('modalFormaPago').value;
+  const valorDesplazamiento = document.getElementById('modalValorDesplazamiento').value;
+
+  // Validación de campos obligatorios
   if (!estadoChip) { errEl.textContent = 'Selecciona un estado'; errEl.style.display = 'block'; return; }
+  if (!fechaEntrega) { errEl.textContent = 'La fecha de entrega es obligatoria'; errEl.style.display = 'block'; return; }
+  if (!formaPago) { errEl.textContent = 'La forma de pago es obligatoria'; errEl.style.display = 'block'; return; }
+  if (valorDesplazamiento === '' || valorDesplazamiento === null || valorDesplazamiento === undefined) {
+    errEl.textContent = 'El valor de desplazamiento es obligatorio (usa 0 si no aplica)';
+    errEl.style.display = 'block';
+    return;
+  }
+
   const btn = document.getElementById('btnGuardarRemision');
   btn.innerHTML = '<span class="spinner"></span>Guardando...';
   try {
     await apiCall('updateRemision', {
       row: selectedRemision.__row, estado: estadoChip.dataset.estado,
-      fechaEntrega: document.getElementById('modalFecha').value,
+      fechaEntrega: fechaEntrega,
       observacion: document.getElementById('modalObs').value,
-      formaPago: document.getElementById('modalFormaPago').value,
-      valorDesplazamiento: document.getElementById('modalValorDesplazamiento').value,
+      formaPago: formaPago,
+      valorDesplazamiento: valorDesplazamiento,
       fotoBase64: modalFotoBase64
     });
     document.getElementById('modalOverlay').classList.remove('active');
@@ -949,32 +995,6 @@ document.getElementById('btnExportarRemisionesExcel').addEventListener('click', 
     XLSX.writeFile(wb, `remisiones_${desde}_a_${hasta}.xlsx`);
   } catch (e) { toast('Error: ' + e.message); }
   finally { btn.innerHTML = '⬇ Descargar Excel'; }
-});
-
-/* ---- Crear remisión (Logística / Administrador) ---- */
-document.getElementById('btnNuevaRemision').addEventListener('click', () => {
-  document.getElementById('nuevaRemisionNum').value = '';
-  document.getElementById('nuevaRemisionError').style.display = 'none';
-  document.getElementById('nuevaRemisionMsg').style.display = 'none';
-  document.getElementById('modalNuevaOverlay').classList.add('active');
-});
-document.getElementById('modalNuevaClose').addEventListener('click', () => document.getElementById('modalNuevaOverlay').classList.remove('active'));
-document.getElementById('btnCrearRemision').addEventListener('click', async () => {
-  const remision = document.getElementById('nuevaRemisionNum').value.trim();
-  const errEl = document.getElementById('nuevaRemisionError');
-  const msgEl = document.getElementById('nuevaRemisionMsg');
-  errEl.style.display = 'none'; msgEl.style.display = 'none';
-  if (!remision) { errEl.textContent = 'Escribe el número de remisión'; errEl.style.display = 'block'; return; }
-  const btn = document.getElementById('btnCrearRemision');
-  btn.innerHTML = '<span class="spinner"></span>Creando...';
-  try {
-    await apiCall('crearRemision', { remision: remision });
-    msgEl.textContent = 'Remisión creada correctamente';
-    msgEl.style.display = 'block';
-    loadRemisiones();
-    setTimeout(() => document.getElementById('modalNuevaOverlay').classList.remove('active'), 1200);
-  } catch (e) { errEl.textContent = e.message; errEl.style.display = 'block'; }
-  finally { btn.innerHTML = 'Crear'; }
 });
 
 /* ======================================================================
