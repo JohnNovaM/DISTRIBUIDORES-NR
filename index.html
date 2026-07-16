@@ -798,6 +798,8 @@ function renderRemisionesPorFechaEntrega(items, cont, totalesCont) {
 // Agrupa remisiones por distribuidor (usado en la vista de Gerencia,
 // Administrador, Logística y Cartera). Si el filtro de estado es
 // "Entregadas", además suma el desplazamiento por cada distribuidor.
+// Si un distribuidor tiene remisiones en más de una ciudad, se agrega
+// un segundo nivel de agrupación por ciudad dentro de su bloque.
 function renderRemisionesPorDistribuidor(items, cont, totalesCont) {
   const grupos = {};
   items.forEach(r => {
@@ -812,16 +814,39 @@ function renderRemisionesPorDistribuidor(items, cont, totalesCont) {
     const grupoItems = grupos[dist];
     const header = document.createElement('div');
     header.className = 'date-group-header';
+    let subtotalDist = 0;
     if (estadoFiltroActual === 'ENTREGADO') {
-      let subtotal = 0;
-      grupoItems.forEach(r => { subtotal += Number(r['VLR DESPLAZAMIENTO'] || r['VALOR DESPLAZAMIENTO']) || 0; });
-      granTotalDesplaz += subtotal;
-      header.innerHTML = `<span>👤 ${escapeHtml(dist)} · ${grupoItems.length} remisión(es)</span><span>Desplaz: $${formatMoney(subtotal)}</span>`;
+      grupoItems.forEach(r => { subtotalDist += Number(r['VLR DESPLAZAMIENTO'] || r['VALOR DESPLAZAMIENTO']) || 0; });
+      granTotalDesplaz += subtotalDist;
+      header.innerHTML = `<span>👤 ${escapeHtml(dist)} · ${grupoItems.length} remisión(es)</span><span>Desplaz: $${formatMoney(subtotalDist)}</span>`;
     } else {
       header.innerHTML = `<span>👤 ${escapeHtml(dist)}</span><span>${grupoItems.length} remisión(es)</span>`;
     }
     cont.appendChild(header);
-    grupoItems.forEach(r => cont.appendChild(renderRemisionCard(r)));
+
+    // Sub-agrupamos por ciudad SOLO si este distribuidor tiene remisiones
+    // en más de una ciudad; si es una sola, no aporta mostrar el subtítulo.
+    const ciudadesDelDist = {};
+    grupoItems.forEach(r => {
+      const ciudad = String(r['ID CIUDAD'] || '').trim() || 'Sin ciudad';
+      if (!ciudadesDelDist[ciudad]) ciudadesDelDist[ciudad] = [];
+      ciudadesDelDist[ciudad].push(r);
+    });
+    const ciudadesOrdenadas = Object.keys(ciudadesDelDist).sort((a, b) => a.localeCompare(b, 'es'));
+
+    if (ciudadesOrdenadas.length > 1) {
+      ciudadesOrdenadas.forEach(ciudad => {
+        const itemsCiudad = ciudadesDelDist[ciudad];
+        const subHeader = document.createElement('div');
+        subHeader.className = 'city-chip';
+        subHeader.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin:6px 0 6px 14px;padding:6px 12px;background:#eef3f1;border-radius:8px;font-size:11.5px;color:var(--primary-dark);cursor:default;';
+        subHeader.innerHTML = `<span>📍 ${escapeHtml(ciudad)}</span><span>${itemsCiudad.length}</span>`;
+        cont.appendChild(subHeader);
+        itemsCiudad.forEach(r => cont.appendChild(renderRemisionCard(r)));
+      });
+    } else {
+      grupoItems.forEach(r => cont.appendChild(renderRemisionCard(r)));
+    }
   });
 
   if (estadoFiltroActual === 'ENTREGADO') {
