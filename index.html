@@ -98,6 +98,17 @@
   #estadoFilterBar{overflow-x:auto;background:transparent;border:none;margin-bottom:8px;padding-left:0;padding-right:0;}
   .date-group-header{display:flex;justify-content:space-between;align-items:center;background:#eef3f1;border-radius:10px;padding:8px 12px;margin:14px 0 8px;font-size:12.5px;font-weight:700;color:var(--primary-dark);}
   .grand-total-box{background:var(--primary);color:#fff;border-radius:12px;padding:14px;margin-top:6px;margin-bottom:12px;display:flex;justify-content:space-between;font-weight:700;font-size:13.5px;}
+  .kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+  .kpi-card{background:var(--card);border:1.5px solid var(--border);border-radius:14px;padding:14px;cursor:pointer;transition:border-color .15s;position:relative;}
+  .kpi-card.active{border-color:var(--primary);box-shadow:0 0 0 2px rgba(44,102,153,.15);}
+  .kpi-card .kpi-icon{font-size:18px;margin-bottom:4px;}
+  .kpi-card .kpi-num{font-size:24px;font-weight:800;line-height:1;color:var(--text);}
+  .kpi-card .kpi-label{font-size:11.5px;color:var(--muted);font-weight:600;margin-top:2px;}
+  .kpi-card .kpi-value{font-size:12.5px;font-weight:700;margin-top:6px;color:var(--primary-dark);}
+  .kpi-card.empty{opacity:.45;cursor:default;}
+  .detalle-header{display:flex;justify-content:space-between;align-items:center;margin:6px 0 10px;}
+  .detalle-header h3{font-size:14px;margin:0;color:var(--primary-dark);}
+  .detalle-header button{background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;font-weight:600;}
 
   /* ---- Contenido ---- */
   main{padding:14px 16px;flex:1;}
@@ -292,14 +303,9 @@
     </main>
 
     <main id="viewPendientes" class="view" style="display:none;">
-      <div class="section-title">Entregas pendientes</div>
-      <div id="pendEntregas"></div>
-      <div class="section-title">Consignaciones pendientes (reporte distribuidor)</div>
-      <div id="pendConsignaciones"></div>
-      <div id="pendCarteraWrap" style="display:none;">
-        <div class="section-title">Pendientes de confirmar (Cartera)</div>
-        <div id="pendCartera"></div>
-      </div>
+      <div class="section-title">Resumen</div>
+      <div class="kpi-grid" id="kpiGrid"></div>
+      <div id="pendientesDetalle"></div>
     </main>
 
     <main id="viewEntradas" class="view" style="display:none;">
@@ -400,7 +406,7 @@ const TABS_BY_ROLE = {
   'DISTRIBUIDOR': ['viewRemisiones', 'viewConsignar', 'viewStock', 'viewPendientes'],
   'GERENCIA':     ['viewRemisiones', 'viewConsignar', 'viewStock', 'viewPendientes'],
   'ADMINISTRADOR':['viewRemisiones', 'viewConsignar', 'viewStock', 'viewPendientes', 'viewEntradas'],
-  'LOGISTICA':    ['viewRemisiones', 'viewStock', 'viewEntradas'],
+  'LOGISTICA':    ['viewRemisiones', 'viewStock', 'viewEntradas', 'viewPendientes'],
   'CARTERA':      ['viewRemisiones', 'viewConsignar', 'viewPendientes']
 };
 const TAB_LABELS = {
@@ -1306,85 +1312,111 @@ document.getElementById('btnSnapshotStock').addEventListener('click', async () =
 });
 
 /* ======================================================================
- *  VISTA PENDIENTES
+ *  VISTA PENDIENTES (dashboard de KPIs)
  * ==================================================================== */
+let pendientesDataCache = null;
+let categoriaAbierta = null;
+
+const CATEGORIAS_PENDIENTES = [
+  { key: 'pendientesSinEstado', icon: '⏳', label: 'Pendientes', badge: 'pendiente', badgeTexto: 'Pendiente',
+    montoCampo: 'VLR REMISION', soloRoles: null },
+  { key: 'reprogramadas', icon: '🔵', label: 'Reprogramadas', badge: 'reprogramado', badgeTexto: 'Reprogramado',
+    montoCampo: 'VLR REMISION', soloRoles: null },
+  { key: 'caidas', icon: '🔴', label: 'Caídas', badge: 'caido', badgeTexto: 'Caído',
+    montoCampo: 'VLR REMISION', soloRoles: null },
+  { key: 'consignacionesPendientes', icon: '💵', label: 'Sin consignar', badge: 'entregado', badgeTexto: 'Entregado',
+    montoCampo: 'VLR REMISION', soloRoles: null },
+  { key: 'pendientesConfirmacionCartera', icon: '🏦', label: 'Por confirmar', badge: 'entregado', badgeTexto: 'Entregado',
+    montoCampo: 'VLR CONSIGNADO', soloRoles: 'cartera' }
+];
+
 async function loadPendientes() {
   const res = await apiCall('getPendientes', { distribuidorId: session.id, nombre: session.nombre, ciudad: session.ciudad, verTodas: !!session.verTodas, filtroDistribuidorId: session.filtroDistId, filtroDistribuidorNombre: session.filtroDistNombre });
+  pendientesDataCache = res;
 
-  const contE = document.getElementById('pendEntregas');
-  contE.innerHTML = '';
-  if (!res.entregasPendientes.length) {
-    contE.innerHTML = '<div class="empty-state">No hay entregas pendientes</div>';
-  } else {
-    res.entregasPendientes.forEach(r => {
-      const estado = String(r['ESTADO'] || '').trim();
-      const badgeClass = estado.toLowerCase() === 'reprogramado' ? 'reprogramado' : 'pendiente';
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.innerHTML = `
-        <div class="row"><strong>Remisión ${escapeHtml(r['REMISION'])}</strong><span class="badge ${badgeClass}">${estado || 'Pendiente'}</span></div>
-        <div class="muted">Fecha: ${escapeHtml(formatVal(r['FECHA']))} · Valor: $${formatMoney(r['VLR REMISION'])}</div>
-      `;
-      contE.appendChild(card);
-    });
-  }
+  const grid = document.getElementById('kpiGrid');
+  grid.innerHTML = '';
 
-  const contC = document.getElementById('pendConsignaciones');
-  contC.innerHTML = '';
-  if (!res.consignacionesPendientes.length) {
-    contC.innerHTML = '<div class="empty-state">No hay consignaciones pendientes</div>';
-  } else {
-    let total = 0;
-    res.consignacionesPendientes.forEach(r => {
-      total += Number(r['VLR REMISION']) || 0;
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.innerHTML = `
-        <div class="row"><strong>Remisión ${escapeHtml(r['REMISION'])}</strong><span class="badge entregado">Entregado</span></div>
-        <div class="muted">Por consignar: $${formatMoney(r['VLR REMISION'])}</div>
-      `;
-      contC.appendChild(card);
-    });
-    const totalBox = document.createElement('div');
-    totalBox.className = 'total-box';
-    totalBox.innerHTML = `<span>Total por consignar</span><span>$${formatMoney(total)}</span>`;
-    contC.appendChild(totalBox);
-  }
+  let totalBadge = 0;
+  CATEGORIAS_PENDIENTES.forEach(cat => {
+    if (cat.soloRoles === 'cartera' && !puedeConfirmarCartera()) return;
+    const lista = res[cat.key] || [];
+    const total = lista.reduce((s, r) => s + (Number(r[cat.montoCampo]) || 0), 0);
+    if (cat.key !== 'pendientesConfirmacionCartera') totalBadge += lista.length; // el badge de la pestaña no cuenta "por confirmar" para no duplicar con Consignar
 
-  const wrapCartera = document.getElementById('pendCarteraWrap');
-  if (puedeConfirmarCartera()) {
-    wrapCartera.style.display = 'block';
-    const contCartera = document.getElementById('pendCartera');
-    contCartera.innerHTML = '';
-    if (!res.pendientesConfirmacionCartera.length) {
-      contCartera.innerHTML = '<div class="empty-state">No hay pagos pendientes de confirmar</div>';
-    } else {
-      res.pendientesConfirmacionCartera.forEach(r => {
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.innerHTML = `
-          <div class="row"><strong>Remisión ${escapeHtml(r['REMISION'])}</strong><span>$${formatMoney(r['VLR CONSIGNADO'])}</span></div>
-          <div class="muted">Distribuidor: ${escapeHtml(r['ID DISTRIBUIDOR'])}</div>
-          <div class="cartera-check"><input type="checkbox"> <span>Confirmar pago visto en banco</span></div>
-        `;
-        const chk = card.querySelector('input');
-        chk.addEventListener('change', async () => {
-          try {
-            await apiCall('confirmarCartera', { row: r.__row, confirmado: chk.checked });
-            toast('Confirmado');
-            loadPendientes();
-          } catch (e) { toast('Error: ' + e.message); chk.checked = false; }
-        });
-        contCartera.appendChild(card);
+    const card = document.createElement('div');
+    card.className = 'kpi-card' + (!lista.length ? ' empty' : '') + (categoriaAbierta === cat.key ? ' active' : '');
+    card.innerHTML = `
+      <div class="kpi-icon">${cat.icon}</div>
+      <div class="kpi-num">${lista.length}</div>
+      <div class="kpi-label">${cat.label}</div>
+      <div class="kpi-value">$${formatMoney(total)}</div>
+    `;
+    if (lista.length) {
+      card.addEventListener('click', () => {
+        categoriaAbierta = (categoriaAbierta === cat.key) ? null : cat.key;
+        renderPendientesDashboard();
       });
     }
-  } else {
-    wrapCartera.style.display = 'none';
-  }
+    grid.appendChild(card);
+  });
 
-  const totalPend = res.entregasPendientes.length + res.consignacionesPendientes.length +
-    (puedeConfirmarCartera() ? res.pendientesConfirmacionCartera.length : 0);
-  updateTabBadgeGenerico('viewPendientes', totalPend);
+  renderDetalleCategoria();
+  updateTabBadgeGenerico('viewPendientes', totalBadge);
+}
+
+// Vuelve a pintar solo el grid (para refrescar el estado "activo" de la
+// tarjeta tocada) sin repetir la llamada al servidor.
+function renderPendientesDashboard() {
+  const grid = document.getElementById('kpiGrid');
+  Array.from(grid.children).forEach((card, i) => {
+    const cats = CATEGORIAS_PENDIENTES.filter(c => c.soloRoles !== 'cartera' || puedeConfirmarCartera());
+    card.classList.toggle('active', categoriaAbierta === cats[i].key);
+  });
+  renderDetalleCategoria();
+}
+
+function renderDetalleCategoria() {
+  const cont = document.getElementById('pendientesDetalle');
+  cont.innerHTML = '';
+  if (!categoriaAbierta || !pendientesDataCache) return;
+
+  const cat = CATEGORIAS_PENDIENTES.find(c => c.key === categoriaAbierta);
+  const lista = pendientesDataCache[categoriaAbierta] || [];
+
+  const header = document.createElement('div');
+  header.className = 'detalle-header';
+  header.innerHTML = `<h3>${cat.icon} ${cat.label} (${lista.length})</h3><button>Cerrar ✕</button>`;
+  header.querySelector('button').addEventListener('click', () => { categoriaAbierta = null; renderPendientesDashboard(); });
+  cont.appendChild(header);
+
+  lista.forEach(r => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    if (cat.key === 'pendientesConfirmacionCartera') {
+      card.innerHTML = `
+        <div class="row"><strong>Remisión ${escapeHtml(r['REMISION'])}</strong><span>$${formatMoney(r['VLR CONSIGNADO'])}</span></div>
+        <div class="muted">Distribuidor: ${escapeHtml(r['ID DISTRIBUIDOR'])}</div>
+        <div class="cartera-check"><input type="checkbox"> <span>Confirmar pago visto en banco</span></div>
+      `;
+      const chk = card.querySelector('input');
+      chk.addEventListener('change', async () => {
+        try {
+          await apiCall('confirmarCartera', { row: r.__row, confirmado: chk.checked });
+          toast('Confirmado');
+          loadPendientes();
+        } catch (e) { toast('Error: ' + e.message); chk.checked = false; }
+      });
+    } else {
+      const extra = !esDistribuidor() ? `<div class="muted">Distribuidor: ${escapeHtml(r['ID DISTRIBUIDOR'])} · ${escapeHtml(r['ID CIUDAD'])}</div>` : '';
+      card.innerHTML = `
+        <div class="row"><strong>Remisión ${escapeHtml(r['REMISION'])}</strong><span class="badge ${cat.badge}">${cat.badgeTexto}</span></div>
+        ${extra}
+        <div class="muted">Fecha: ${escapeHtml(formatVal(r['FECHA']))} · Valor: $${formatMoney(r[cat.montoCampo])}</div>
+      `;
+    }
+    cont.appendChild(card);
+  });
 }
 
 /* ======================================================================
