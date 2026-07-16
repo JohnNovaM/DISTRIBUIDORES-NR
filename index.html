@@ -254,13 +254,13 @@
     <main id="viewConsignar" class="view" style="display:none;">
       <div id="consignarFormWrap">
         <div class="section-title">Reportar consignación</div>
-        <label>Remisiones que incluye esta consignación</label>
+        <label>Remisiones que incluye esta consignación *</label>
         <div class="checklist" id="checklistRemisiones"></div>
-        <label>Fecha(s) de entrega que consigna</label>
-        <input type="text" id="consFechas" placeholder="Ej: 10/07, 11/07/2026">
-        <label>Valor consignado</label>
-        <input type="number" id="consValor" placeholder="0">
-        <label>Comprobante (foto)</label>
+        <label>Fecha de la consignación *</label>
+        <input type="date" id="consFechas">
+        <label>Valor consignado *</label>
+        <input type="text" inputmode="numeric" id="consValor" placeholder="$ 0">
+        <label>Comprobante (foto) *</label>
         <div class="file-drop" id="consFotoDrop">📷 Toca para tomar/adjuntar foto</div>
         <input type="file" id="consFotoInput" accept="image/*" capture="environment" style="display:none;">
         <label>Observaciones</label>
@@ -1175,20 +1175,35 @@ document.getElementById('consFotoInput').addEventListener('change', async (e) =>
   document.getElementById('consFotoDrop').innerHTML = `✅ Foto lista <img src="${consFotoBase64}">`;
 });
 
+// Formatea el campo de valor consignado como moneda colombiana mientras
+// se escribe ($ 1.234.567), guardando el número real por separado.
+function attachCurrencyFormatting(input) {
+  input.addEventListener('input', () => {
+    const raw = input.value.replace(/\D/g, '');
+    input.value = raw ? '$ ' + Number(raw).toLocaleString('es-CO') : '';
+  });
+}
+function getCurrencyValue(input) {
+  return Number(input.value.replace(/\D/g, '')) || 0;
+}
+attachCurrencyFormatting(document.getElementById('consValor'));
+
 document.getElementById('btnEnviarConsignacion').addEventListener('click', async () => {
   const msgEl = document.getElementById('consMsg');
   msgEl.style.display = 'none';
   const checks = Array.from(document.querySelectorAll('#checklistRemisiones input:checked'));
-  const valor = document.getElementById('consValor').value;
+  const valor = getCurrencyValue(document.getElementById('consValor'));
   const fechas = document.getElementById('consFechas').value;
   if (!checks.length) { toast('Selecciona al menos una remisión'); return; }
+  if (!fechas) { toast('Selecciona la fecha de la consignación'); return; }
   if (!valor) { toast('Indica el valor consignado'); return; }
+  if (!consFotoBase64) { toast('La foto del comprobante es obligatoria'); return; }
   const btn = document.getElementById('btnEnviarConsignacion');
   btn.innerHTML = '<span class="spinner"></span>Enviando...';
   try {
     await apiCall('addConsignacion', {
-      distribuidorId: session.id, ciudad: session.ciudad, fechas: fechas,
-      valorConsignado: Number(valor), fotoBase64: consFotoBase64,
+      distribuidorId: session.id, nombre: session.nombre, ciudad: session.ciudad, fechas: fechas,
+      valorConsignado: valor, fotoBase64: consFotoBase64,
       remisiones: checks.map(c => c.dataset.remision), remisionRows: checks.map(c => Number(c.value)),
       observaciones: document.getElementById('consObs').value
     });
