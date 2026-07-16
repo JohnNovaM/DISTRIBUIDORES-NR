@@ -309,6 +309,17 @@
       <div class="product-grid" id="entProductGrid"></div>
       <button class="primary" id="btnGuardarEntrada">Guardar entrada</button>
       <p class="success-msg" id="entMsg"></p>
+
+      <div class="section-title" style="margin-top:26px;">⚠️ Reportar producto averiado</div>
+      <label>Distribuidor</label>
+      <select id="avDistribuidor"></select>
+      <label>Ciudad</label>
+      <select id="avCiudad"></select>
+      <label>Fecha</label>
+      <input type="date" id="avFecha">
+      <div class="product-grid" id="avProductGrid"></div>
+      <button class="secondary" id="btnGuardarAveria">Guardar avería</button>
+      <p class="success-msg" id="avMsg"></p>
     </main>
   </section>
 
@@ -1255,13 +1266,20 @@ async function loadStock() {
   productHeadersCache = res.stock.map(p => p.producto);
   const cont = document.getElementById('stockCard');
   cont.innerHTML = '';
-  if (!res.stock.length) { cont.innerHTML = '<div class="empty-state">Sin datos de stock</div>'; return; }
-  res.stock.forEach(p => {
+
+  // Solo mostramos productos que este distribuidor/filtro realmente ha
+  // movido alguna vez (asignado, entregado o averiado). Evita ensuciar
+  // la vista con productos que nunca ha manejado.
+  const conMovimiento = res.stock.filter(p => p.totalAsignado || p.totalEntregado || p.totalAveriado);
+
+  if (!conMovimiento.length) { cont.innerHTML = '<div class="empty-state">Sin movimientos de stock todavía</div>'; return; }
+  conMovimiento.forEach(p => {
     const row = document.createElement('div');
     row.className = 'stock-row';
+    const averiaTxt = p.totalAveriado > 0 ? ` · Averiado: ${p.totalAveriado}` : '';
     row.innerHTML = `
       <div><div><strong>${escapeHtml(p.producto)}</strong></div>
-      <div class="muted">Asignado: ${p.totalAsignado} · Entregado: ${p.totalEntregado}</div></div>
+      <div class="muted">Asignado: ${p.totalAsignado} · Entregado: ${p.totalEntregado}${averiaTxt}</div></div>
       <div class="stock-num ${p.stock < 0 ? 'neg' : ''}">${p.stock}</div>
     `;
     cont.appendChild(row);
@@ -1353,51 +1371,60 @@ async function loadPendientes() {
 /* ======================================================================
  *  VISTA ENTRADAS (Logística / Administrador)
  * ==================================================================== */
+function setupDistribuidorCiudadSelect(selDist, selCiudad, distribuidores) {
+  if (selDist.dataset.loaded) return;
+  selDist.innerHTML = '<option value="">Selecciona...</option>';
+  distribuidores.forEach(d => {
+    const opt = document.createElement('option');
+    opt.value = d.id;
+    opt.textContent = d.nombre;
+    opt.dataset.ciudades = JSON.stringify(d.ciudades);
+    selDist.appendChild(opt);
+  });
+  selDist.dataset.loaded = '1';
+  selDist.addEventListener('change', () => {
+    const opt = selDist.options[selDist.selectedIndex];
+    const ciudades = opt.dataset.ciudades ? JSON.parse(opt.dataset.ciudades) : [];
+    selCiudad.innerHTML = '';
+    ciudades.forEach(c => {
+      const o = document.createElement('option');
+      o.value = c; o.textContent = c;
+      selCiudad.appendChild(o);
+    });
+  });
+}
+
+function buildProductGrid(grid, productos) {
+  if (grid.dataset.built) return;
+  grid.innerHTML = '';
+  productos.forEach(p => {
+    const div = document.createElement('div');
+    div.className = 'pfield';
+    div.innerHTML = `<label>${escapeHtml(p)}</label><input type="number" min="0" value="0" data-producto="${escapeHtml(p)}">`;
+    grid.appendChild(div);
+  });
+  grid.dataset.built = '1';
+}
+
 async function loadEntradasView() {
-  const selDist = document.getElementById('entDistribuidor');
-  if (!selDist.dataset.loaded) {
-    const res = await apiCall('getDistribuidores', {});
-    selDist.innerHTML = '<option value="">Selecciona...</option>';
-    res.distribuidores.forEach(d => {
-      const opt = document.createElement('option');
-      opt.value = d.id;
-      opt.textContent = d.nombre;
-      opt.dataset.ciudades = JSON.stringify(d.ciudades);
-      selDist.appendChild(opt);
-    });
-    selDist.dataset.loaded = '1';
-    selDist.addEventListener('change', () => {
-      const opt = selDist.options[selDist.selectedIndex];
-      const ciudades = opt.dataset.ciudades ? JSON.parse(opt.dataset.ciudades) : [];
-      const selCiudad = document.getElementById('entCiudad');
-      selCiudad.innerHTML = '';
-      ciudades.forEach(c => {
-        const o = document.createElement('option');
-        o.value = c; o.textContent = c;
-        selCiudad.appendChild(o);
-      });
-    });
-  }
-
-  if (!document.getElementById('entFecha').value) {
-    document.getElementById('entFecha').value = new Date().toISOString().slice(0, 10);
-  }
-
   if (!productHeadersCache.length) {
     const res = await apiCall('getStock', { distribuidorId: '', nombre: '', ciudad: '', verTodas: true });
     productHeadersCache = res.stock.map(p => p.producto);
   }
-  const grid = document.getElementById('entProductGrid');
-  if (!grid.dataset.built) {
-    grid.innerHTML = '';
-    productHeadersCache.forEach(p => {
-      const div = document.createElement('div');
-      div.className = 'pfield';
-      div.innerHTML = `<label>${escapeHtml(p)}</label><input type="number" min="0" value="0" data-producto="${escapeHtml(p)}">`;
-      grid.appendChild(div);
-    });
-    grid.dataset.built = '1';
+
+  const distRes = await apiCall('getDistribuidores', {});
+
+  setupDistribuidorCiudadSelect(document.getElementById('entDistribuidor'), document.getElementById('entCiudad'), distRes.distribuidores);
+  if (!document.getElementById('entFecha').value) {
+    document.getElementById('entFecha').value = new Date().toISOString().slice(0, 10);
   }
+  buildProductGrid(document.getElementById('entProductGrid'), productHeadersCache);
+
+  setupDistribuidorCiudadSelect(document.getElementById('avDistribuidor'), document.getElementById('avCiudad'), distRes.distribuidores);
+  if (!document.getElementById('avFecha').value) {
+    document.getElementById('avFecha').value = new Date().toISOString().slice(0, 10);
+  }
+  buildProductGrid(document.getElementById('avProductGrid'), productHeadersCache);
 }
 
 document.getElementById('btnGuardarEntrada').addEventListener('click', async () => {
@@ -1424,6 +1451,32 @@ document.getElementById('btnGuardarEntrada').addEventListener('click', async () 
     document.querySelectorAll('#entProductGrid input').forEach(inp => inp.value = 0);
   } catch (e) { toast('Error: ' + e.message); }
   finally { btn.innerHTML = 'Guardar entrada'; }
+});
+
+document.getElementById('btnGuardarAveria').addEventListener('click', async () => {
+  const msgEl = document.getElementById('avMsg');
+  msgEl.style.display = 'none';
+  const distId = document.getElementById('avDistribuidor').value;
+  const ciudad = document.getElementById('avCiudad').value;
+  const fecha = document.getElementById('avFecha').value;
+  if (!distId || !ciudad) { toast('Selecciona distribuidor y ciudad'); return; }
+
+  const productos = {};
+  document.querySelectorAll('#avProductGrid input').forEach(inp => {
+    const v = Number(inp.value) || 0;
+    if (v > 0) productos[inp.dataset.producto] = v;
+  });
+  if (!Object.keys(productos).length) { toast('Ingresa al menos un producto averiado'); return; }
+
+  const btn = document.getElementById('btnGuardarAveria');
+  btn.innerHTML = '<span class="spinner"></span>Guardando...';
+  try {
+    await apiCall('addAveria', { distribuidorId: distId, ciudad, fecha, productos });
+    msgEl.textContent = 'Avería registrada correctamente';
+    msgEl.style.display = 'block';
+    document.querySelectorAll('#avProductGrid input').forEach(inp => inp.value = 0);
+  } catch (e) { toast('Error: ' + e.message); }
+  finally { btn.innerHTML = 'Guardar avería'; }
 });
 
 /* ======================================================================
