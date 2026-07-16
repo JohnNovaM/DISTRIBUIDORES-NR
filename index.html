@@ -283,8 +283,12 @@
     </main>
 
     <main id="viewStock" class="view" style="display:none;">
-      <div class="section-title">Stock disponible</div>
+      <div class="section-title">
+        <span>Stock disponible</span>
+        <button class="small-btn outline" id="btnSnapshotStock" style="display:none;">📸 Guardar snapshot de hoy</button>
+      </div>
       <div class="card" id="stockCard"></div>
+      <p class="success-msg" id="snapshotMsg"></p>
     </main>
 
     <main id="viewPendientes" class="view" style="display:none;">
@@ -1264,6 +1268,7 @@ document.getElementById('btnExportarExcel').addEventListener('click', async () =
 async function loadStock() {
   const res = await apiCall('getStock', { distribuidorId: session.id, nombre: session.nombre, ciudad: session.ciudad, verTodas: !!session.verTodas, filtroDistribuidorId: session.filtroDistId, filtroDistribuidorNombre: session.filtroDistNombre });
   productHeadersCache = res.stock.map(p => p.producto);
+  document.getElementById('btnSnapshotStock').style.display = ['ADMINISTRADOR', 'LOGISTICA'].includes(rolUpper()) ? 'inline-block' : 'none';
   const cont = document.getElementById('stockCard');
   cont.innerHTML = '';
 
@@ -1285,6 +1290,20 @@ async function loadStock() {
     cont.appendChild(row);
   });
 }
+
+document.getElementById('btnSnapshotStock').addEventListener('click', async () => {
+  const msgEl = document.getElementById('snapshotMsg');
+  msgEl.style.display = 'none';
+  const btn = document.getElementById('btnSnapshotStock');
+  btn.innerHTML = '<span class="spinner"></span>Guardando...';
+  try {
+    const res = await apiCall('guardarSnapshotStock', {});
+    msgEl.textContent = `Snapshot del ${res.fecha} guardado: ${res.filas} filas.`;
+    msgEl.style.display = 'block';
+    toast('Snapshot guardado');
+  } catch (e) { toast('Error: ' + e.message); }
+  finally { btn.innerHTML = '📸 Guardar snapshot de hoy'; }
+});
 
 /* ======================================================================
  *  VISTA PENDIENTES
