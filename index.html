@@ -183,6 +183,10 @@
   .stock-row:last-child{border-bottom:none;}
   .stock-num{font-weight:700;font-size:15px;}
   .stock-num.neg{color:var(--danger);}
+  .stock-row-dual{align-items:flex-start;}
+  .stock-dual-nums{display:flex;gap:16px;}
+  .stock-dual-item{text-align:center;}
+  .stock-dual-label{font-size:9.5px;color:var(--muted);font-weight:700;text-transform:uppercase;margin-top:1px;}
   .total-box{background:#eef3f1;border-radius:12px;padding:14px;margin-top:12px;display:flex;justify-content:space-between;font-weight:700;}
   .cartera-check{display:flex;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);font-size:13px;font-weight:600;}
   .cartera-check input{width:auto;}
@@ -1279,19 +1283,30 @@ async function loadStock() {
   cont.innerHTML = '';
 
   // Solo mostramos productos que este distribuidor/filtro realmente ha
-  // movido alguna vez (asignado, entregado o averiado). Evita ensuciar
+  // movido alguna vez (asignado, programado o averiado). Evita ensuciar
   // la vista con productos que nunca ha manejado.
-  const conMovimiento = res.stock.filter(p => p.totalAsignado || p.totalEntregado || p.totalAveriado);
+  const conMovimiento = res.stock.filter(p => p.totalAsignado || p.totalProgramado || p.totalAveriado);
 
   if (!conMovimiento.length) { cont.innerHTML = '<div class="empty-state">Sin movimientos de stock todavía</div>'; return; }
   conMovimiento.forEach(p => {
     const row = document.createElement('div');
-    row.className = 'stock-row';
+    row.className = 'stock-row stock-row-dual';
     const averiaTxt = p.totalAveriado > 0 ? ` · Averiado: ${p.totalAveriado}` : '';
     row.innerHTML = `
-      <div><div><strong>${escapeHtml(p.producto)}</strong></div>
-      <div class="muted">Asignado: ${p.totalAsignado} · Entregado: ${p.totalEntregado}${averiaTxt}</div></div>
-      <div class="stock-num ${p.stock < 0 ? 'neg' : ''}">${p.stock}</div>
+      <div>
+        <div><strong>${escapeHtml(p.producto)}</strong></div>
+        <div class="muted">Asignado: ${p.totalAsignado} · Programado: ${p.totalProgramado} · Entregado: ${p.totalEntregado}${averiaTxt}</div>
+      </div>
+      <div class="stock-dual-nums">
+        <div class="stock-dual-item">
+          <div class="stock-num ${p.disponibleParaProgramar < 0 ? 'neg' : ''}">${p.disponibleParaProgramar}</div>
+          <div class="stock-dual-label">Disponible</div>
+        </div>
+        <div class="stock-dual-item">
+          <div class="stock-num ${p.enMano < 0 ? 'neg' : ''}">${p.enMano}</div>
+          <div class="stock-dual-label">En mano</div>
+        </div>
+      </div>
     `;
     cont.appendChild(row);
   });
