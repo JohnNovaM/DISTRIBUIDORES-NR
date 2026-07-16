@@ -12,7 +12,7 @@
  *    la versión vieja de la app aunque tú ya hayas subido cambios.
  ***********************************************************************/
 
-var CACHE_VERSION = 'v1';
+var CACHE_VERSION = 'v2';
 var CACHE_NAME = 'natural-resvex-' + CACHE_VERSION;
 
 // Archivos del "cascarón" de la app (shell): lo mínimo para que la
