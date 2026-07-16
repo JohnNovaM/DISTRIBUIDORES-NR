@@ -123,7 +123,7 @@
   }
   nav.tabbar button{
     flex:1;background:none;border:none;padding:10px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:3px;
-    color:var(--muted);font-size:10.5px;cursor:pointer;font-weight:600;
+    color:var(--muted);font-size:10.5px;cursor:pointer;font-weight:600;position:relative;
   }
   nav.tabbar button .ic{font-size:19px;}
   nav.tabbar button.active{color:var(--primary);}
@@ -163,7 +163,10 @@
   }
   @keyframes spin{to{transform:rotate(360deg);}}
   .city-btn{width:100%;padding:16px;margin-bottom:10px;border-radius:12px;border:1.5px solid var(--border);background:#fff;
-    font-size:15px;font-weight:600;text-align:left;cursor:pointer;color:var(--text);}
+    font-size:15px;font-weight:600;text-align:left;cursor:pointer;color:var(--text);display:flex;justify-content:space-between;align-items:center;}
+  .pending-badge{background:var(--danger);color:#fff;font-size:12px;font-weight:800;border-radius:20px;padding:2px 9px;min-width:20px;text-align:center;}
+  .chip-badge{background:var(--danger);color:#fff;font-size:10.5px;font-weight:800;border-radius:20px;padding:1px 7px;margin-left:5px;}
+  .tab-badge{position:absolute;top:2px;right:calc(50% - 22px);background:var(--danger);color:#fff;font-size:9.5px;font-weight:800;border-radius:20px;padding:1px 5px;min-width:14px;text-align:center;line-height:1.3;}
   .city-btn:active{border-color:var(--primary);}
   .stock-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border);}
   .stock-row:last-child{border-bottom:none;}
@@ -508,13 +511,14 @@ function goAfterLogin() {
   }
 }
 
-function renderCityList() {
+async function renderCityList() {
   const cont = document.getElementById('cityList');
   cont.innerHTML = '';
   session.ciudades.forEach(c => {
     const b = document.createElement('button');
     b.className = 'city-btn';
-    b.textContent = c;
+    b.innerHTML = `<span>${escapeHtml(c)}</span>`;
+    b.dataset.ciudad = c;
     b.onclick = () => {
       session.ciudad = c;
       localStorage.setItem('distribuidor_session', JSON.stringify(session));
@@ -523,6 +527,19 @@ function renderCityList() {
     };
     cont.appendChild(b);
   });
+
+  // Trae el conteo de pendientes por ciudad y lo pinta como badge,
+  // así se detecta a simple vista dónde hay que actuar sin entrar
+  // ciudad por ciudad.
+  try {
+    const res = await apiCall('getResumenCiudades', { distribuidorId: session.id, nombre: session.nombre, ciudades: session.ciudades });
+    cont.querySelectorAll('.city-btn').forEach(b => {
+      const n = res.counts[b.dataset.ciudad] || 0;
+      if (n > 0) {
+        b.innerHTML += `<span class="pending-badge">${n}</span>`;
+      }
+    });
+  } catch (e) { /* si falla el conteo, igual se puede elegir la ciudad */ }
 }
 
 function showScreen(id) {
@@ -618,26 +635,33 @@ function selectTab(viewId, btnEl) {
  *  FILTRO EN CASCADA: DISTRIBUIDOR -> CIUDAD (roles con acceso total)
  * ==================================================================== */
 let distribuidoresCache = [];
+let resumenGlobalCache = { porDistribuidor: {}, porCiudad: {} };
 
 async function renderDistFilterBar() {
   const bar = document.getElementById('distFilterBar');
   bar.style.display = 'flex';
   bar.innerHTML = '<span class="city-chip">Cargando...</span>';
   try {
-    const res = await apiCall('getDistribuidores', {});
+    const [res, resumen] = await Promise.all([
+      apiCall('getDistribuidores', {}),
+      apiCall('getResumenGlobal', {})
+    ]);
     distribuidoresCache = res.distribuidores;
+    resumenGlobalCache = resumen;
     bar.innerHTML = '';
 
+    const totalGeneral = Object.values(resumenGlobalCache.porDistribuidor).reduce((a, b) => a + b, 0);
     const chipTodos = document.createElement('div');
     chipTodos.className = 'city-chip' + (!session.filtroDistId ? ' active' : '');
-    chipTodos.textContent = 'Todos';
+    chipTodos.innerHTML = 'Todos' + (totalGeneral > 0 ? ` <span class="chip-badge">${totalGeneral}</span>` : '');
     chipTodos.onclick = () => selectDistribuidorFiltro('', '', chipTodos);
     bar.appendChild(chipTodos);
 
     distribuidoresCache.forEach(d => {
       const chip = document.createElement('div');
       chip.className = 'city-chip' + (session.filtroDistId === String(d.id) ? ' active' : '');
-      chip.textContent = d.nombre;
+      const n = resumenGlobalCache.porDistribuidor[String(d.id)] || 0;
+      chip.innerHTML = escapeHtml(d.nombre) + (n > 0 ? ` <span class="chip-badge">${n}</span>` : '');
       chip.onclick = () => selectDistribuidorFiltro(String(d.id), d.nombre, chip);
       bar.appendChild(chip);
     });
@@ -689,7 +713,8 @@ async function renderCityFilterBar() {
     ciudadesDisponibles.forEach(c => {
       const chip = document.createElement('div');
       chip.className = 'city-chip' + (session.ciudad === c ? ' active' : '');
-      chip.textContent = c;
+      const n = resumenGlobalCache.porCiudad[c.trim().toLowerCase()] || 0;
+      chip.innerHTML = escapeHtml(c) + (n > 0 ? ` <span class="chip-badge">${n}</span>` : '');
       chip.onclick = () => selectCiudadFiltro(c, chip);
       bar.appendChild(chip);
     });
@@ -791,6 +816,22 @@ async function loadRemisiones() {
     document.getElementById('estadoFilterBar').dataset.built = '1';
   }
   renderRemisiones();
+  updateTabBadgeGenerico('viewRemisiones', remisionesCache.filter(r => estadoKey(r['ESTADO']) === 'PENDIENTE').length);
+}
+
+// Pinta (o quita) el numerito rojo sobre una pestaña de la barra
+// inferior, para ver pendientes sin tener que entrar a la vista.
+function updateTabBadgeGenerico(viewId, count) {
+  const btn = document.querySelector(`#tabbar .tab[data-view="${viewId}"]`);
+  if (!btn) return;
+  const existente = btn.querySelector('.tab-badge');
+  if (existente) existente.remove();
+  if (count > 0) {
+    const badge = document.createElement('span');
+    badge.className = 'tab-badge';
+    badge.textContent = count > 99 ? '99+' : count;
+    btn.appendChild(badge);
+  }
 }
 
 function renderRemisiones() {
@@ -1288,6 +1329,10 @@ async function loadPendientes() {
   } else {
     wrapCartera.style.display = 'none';
   }
+
+  const totalPend = res.entregasPendientes.length + res.consignacionesPendientes.length +
+    (puedeConfirmarCartera() ? res.pendientesConfirmacionCartera.length : 0);
+  updateTabBadgeGenerico('viewPendientes', totalPend);
 }
 
 /* ======================================================================
