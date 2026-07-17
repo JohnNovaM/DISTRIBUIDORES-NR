@@ -1026,20 +1026,13 @@ function renderRemisionCard(r) {
     actionsRow.appendChild(btnPdf);
   }
 
-  if (puedeConfirmarCartera() && estado.toLowerCase() === 'entregado') {
-    const wrap = document.createElement('div');
-    wrap.className = 'cartera-check';
+  if (estado.toLowerCase() === 'entregado' && r['ID CONSIGNACION']) {
     const confirmado = String(r['CONFIRMADO CARTERA'] || '').trim().toUpperCase() === 'SI';
-    wrap.innerHTML = `<input type="checkbox" ${confirmado ? 'checked' : ''}> <span>Pago confirmado por Cartera</span>`;
-    const chk = wrap.querySelector('input');
-    chk.addEventListener('click', (ev) => ev.stopPropagation());
-    chk.addEventListener('change', async () => {
-      try {
-        await apiCall('confirmarCartera', { row: r.__row, confirmado: chk.checked });
-        toast('Actualizado');
-      } catch (e) { toast('Error: ' + e.message); chk.checked = !chk.checked; }
-    });
-    card.appendChild(wrap);
+    const info = document.createElement('div');
+    info.className = 'muted';
+    info.style.marginTop = '8px';
+    info.textContent = confirmado ? '✅ Pago confirmado por Cartera' : '🕓 Consignada, esperando revisión de Cartera';
+    card.appendChild(info);
   }
 
   return card;
@@ -1180,16 +1173,71 @@ async function loadConsignacionesHistorial() {
     return;
   }
   res.consignaciones.slice().reverse().forEach(c => {
-    const card = document.createElement('div');
-    card.className = 'card';
-    card.innerHTML = `
-      <div class="row"><strong>Consignación #${escapeHtml(c['ID CONSIGNACIONES'])}</strong><span>$${formatMoney(c['VALOR CONSIGNADO'])}</span></div>
-      ${!esDistribuidor() ? '<div class="muted">Distribuidor: ' + escapeHtml(c['ID DISTRIBUIDOR']) + ' · ' + escapeHtml(c['CIUDAD']) + '</div>' : ''}
-      <div class="muted">Remisiones: ${escapeHtml(c['REMISIONES QUE CONSIGNA'] || '-')}</div>
-      <div class="muted">Fecha(s): ${escapeHtml(c['FECHAS DE ENTREGAS QUE CONSIGNA'] || '-')}</div>
-    `;
-    cont.appendChild(card);
+    cont.appendChild(renderConsignacionCard(c, { onUpdate: loadConsignarView }));
   });
+}
+
+// Tarjeta reutilizable de consignación: muestra el comprobante (foto)
+// y, si eres Cartera/Administrador, los controles de revisión
+// (Confirmar / Pendiente / Rechazar + observación + fecha editable).
+// Se usa tanto en el historial de Consignar como en el dashboard de
+// Pendientes ("Por confirmar"), para no duplicar la lógica.
+function renderConsignacionCard(c, opciones) {
+  opciones = opciones || {};
+  const estado = String(c['ESTADO'] || 'Pendiente').trim() || 'Pendiente';
+  const estadoLower = estado.toLowerCase();
+  const badgeClass = estadoLower === 'confirmado' ? 'entregado' : estadoLower === 'rechazado' ? 'caido' : 'pendiente';
+
+  const card = document.createElement('div');
+  card.className = 'card';
+  const fotoHtml = c['FOTO']
+    ? `<a href="${c['FOTO']}" target="_blank" rel="noopener"><img src="${c['FOTO']}" style="max-width:100%;border-radius:10px;margin-top:8px;display:block;" alt="Comprobante"></a>`
+    : '<div class="muted" style="margin-top:8px;">⚠️ Sin foto de comprobante</div>';
+
+  card.innerHTML = `
+    <div class="row"><strong>Consignación #${escapeHtml(c['ID CONSIGNACIONES'])}</strong><span class="badge ${badgeClass}">${escapeHtml(estado)}</span></div>
+    ${!esDistribuidor() ? '<div class="muted">Distribuidor: ' + escapeHtml(c['ID DISTRIBUIDOR']) + ' · ' + escapeHtml(c['CIUDAD']) + '</div>' : ''}
+    <div class="muted">Remisiones: ${escapeHtml(c['REMISIONES QUE CONSIGNA'] || '-')}</div>
+    <div class="muted">Valor: $${formatMoney(c['VALOR CONSIGNADO'])} · Fecha: ${escapeHtml(formatVal(c['FECHAS DE ENTREGAS QUE CONSIGNA']))}</div>
+    ${c['OBSERVACIONES'] ? '<div class="muted">Nota del distribuidor: ' + escapeHtml(c['OBSERVACIONES']) + '</div>' : ''}
+    ${fotoHtml}
+  `;
+
+  if (puedeConfirmarCartera()) {
+    const wrap = document.createElement('div');
+    wrap.style.marginTop = '10px';
+    wrap.style.paddingTop = '10px';
+    wrap.style.borderTop = '1px dashed var(--border)';
+    wrap.innerHTML = `
+      <label>Fecha de consignación</label>
+      <input type="date" class="rev-fecha" value="${formatValISO(c['FECHAS DE ENTREGAS QUE CONSIGNA'])}">
+      <label>Observación de Cartera</label>
+      <textarea class="rev-obs" placeholder="Notas de revisión (opcional)...">${escapeHtml(c['OBSERVACION CARTERA'] || '')}</textarea>
+      <div class="chip-select" style="margin-top:8px;">
+        <div class="chip sel-entregado rev-chip" data-accion="confirmar">✅ Confirmar</div>
+        <div class="chip sel-reprogramado rev-chip" data-accion="pendiente">🕓 Pendiente</div>
+        <div class="chip sel-caido rev-chip" data-accion="rechazar">❌ Rechazar</div>
+      </div>
+    `;
+    const chips = wrap.querySelectorAll('.rev-chip');
+    chips.forEach(chip => {
+      if (chip.dataset.accion === estadoLower) chip.classList.add('active');
+      chip.addEventListener('click', async () => {
+        chips.forEach(b => b.classList.remove('active'));
+        chip.classList.add('active');
+        const fecha = wrap.querySelector('.rev-fecha').value;
+        const obs = wrap.querySelector('.rev-obs').value;
+        try {
+          await apiCall('revisarConsignacion', { consignacionRow: c.__row, accion: chip.dataset.accion, observacion: obs, fechaConsignacion: fecha });
+          toast(chip.dataset.accion === 'confirmar' ? 'Consignación confirmada' : chip.dataset.accion === 'rechazar' ? 'Consignación rechazada — el distribuidor la verá pendiente de nuevo' : 'Marcada como pendiente');
+          if (opciones.onUpdate) opciones.onUpdate();
+        } catch (e) { toast('Error: ' + e.message); }
+      });
+    });
+    card.appendChild(wrap);
+  }
+
+  return card;
 }
 
 document.getElementById('consFotoDrop').addEventListener('click', () => document.getElementById('consFotoInput').click());
@@ -1342,7 +1390,7 @@ const CATEGORIAS_PENDIENTES = [
   { key: 'consignacionesPendientes', icon: '💵', label: 'Sin consignar', badge: 'entregado', badgeTexto: 'Entregado',
     montoCampo: 'VLR REMISION', soloRoles: null },
   { key: 'pendientesConfirmacionCartera', icon: '🏦', label: 'Por confirmar', badge: 'entregado', badgeTexto: 'Entregado',
-    montoCampo: 'VLR CONSIGNADO', soloRoles: 'cartera' }
+    montoCampo: 'VALOR CONSIGNADO', soloRoles: 'cartera' }
 ];
 
 async function loadPendientes() {
@@ -1406,30 +1454,18 @@ function renderDetalleCategoria() {
   cont.appendChild(header);
 
   lista.forEach(r => {
+    if (cat.key === 'pendientesConfirmacionCartera') {
+      cont.appendChild(renderConsignacionCard(r, { onUpdate: loadPendientes }));
+      return;
+    }
     const card = document.createElement('div');
     card.className = 'card';
-    if (cat.key === 'pendientesConfirmacionCartera') {
-      card.innerHTML = `
-        <div class="row"><strong>Remisión ${escapeHtml(r['REMISION'])}</strong><span>$${formatMoney(r['VLR CONSIGNADO'])}</span></div>
-        <div class="muted">Distribuidor: ${escapeHtml(r['ID DISTRIBUIDOR'])}</div>
-        <div class="cartera-check"><input type="checkbox"> <span>Confirmar pago visto en banco</span></div>
-      `;
-      const chk = card.querySelector('input');
-      chk.addEventListener('change', async () => {
-        try {
-          await apiCall('confirmarCartera', { row: r.__row, confirmado: chk.checked });
-          toast('Confirmado');
-          loadPendientes();
-        } catch (e) { toast('Error: ' + e.message); chk.checked = false; }
-      });
-    } else {
-      const extra = !esDistribuidor() ? `<div class="muted">Distribuidor: ${escapeHtml(r['ID DISTRIBUIDOR'])} · ${escapeHtml(r['ID CIUDAD'])}</div>` : '';
-      card.innerHTML = `
-        <div class="row"><strong>Remisión ${escapeHtml(r['REMISION'])}</strong><span class="badge ${cat.badge}">${cat.badgeTexto}</span></div>
-        ${extra}
-        <div class="muted">Fecha: ${escapeHtml(formatVal(r['FECHA']))} · Valor: $${formatMoney(r[cat.montoCampo])}</div>
-      `;
-    }
+    const extra = !esDistribuidor() ? `<div class="muted">Distribuidor: ${escapeHtml(r['ID DISTRIBUIDOR'])} · ${escapeHtml(r['ID CIUDAD'])}</div>` : '';
+    card.innerHTML = `
+      <div class="row"><strong>Remisión ${escapeHtml(r['REMISION'])}</strong><span class="badge ${cat.badge}">${cat.badgeTexto}</span></div>
+      ${extra}
+      <div class="muted">Fecha: ${escapeHtml(formatVal(r['FECHA']))} · Valor: $${formatMoney(r[cat.montoCampo])}</div>
+    `;
     cont.appendChild(card);
   });
 }
