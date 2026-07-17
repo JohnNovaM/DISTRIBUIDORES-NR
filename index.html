@@ -544,10 +544,11 @@ function goAfterLogin() {
   }
   if (session.ciudades.length === 1) {
     session.ciudad = session.ciudades[0];
+    session.ciudadElegida = true;
     localStorage.setItem('distribuidor_session', JSON.stringify(session));
     showScreen('main-screen');
     startApp();
-  } else if (session.ciudad) {
+  } else if (session.ciudadElegida) {
     showScreen('main-screen');
     startApp();
   } else {
@@ -559,6 +560,23 @@ function goAfterLogin() {
 async function renderCityList() {
   const cont = document.getElementById('cityList');
   cont.innerHTML = '';
+
+  if (session.ciudades.length > 1) {
+    const btnTodas = document.createElement('button');
+    btnTodas.className = 'city-btn';
+    btnTodas.style.borderColor = 'var(--primary)';
+    btnTodas.style.color = 'var(--primary-dark)';
+    btnTodas.innerHTML = '<span>🌎 Todas mis ciudades</span>';
+    btnTodas.onclick = () => {
+      session.ciudad = '';
+      session.ciudadElegida = true;
+      localStorage.setItem('distribuidor_session', JSON.stringify(session));
+      showScreen('main-screen');
+      startApp();
+    };
+    cont.appendChild(btnTodas);
+  }
+
   session.ciudades.forEach(c => {
     const b = document.createElement('button');
     b.className = 'city-btn';
@@ -566,6 +584,7 @@ async function renderCityList() {
     b.dataset.ciudad = c;
     b.onclick = () => {
       session.ciudad = c;
+      session.ciudadElegida = true;
       localStorage.setItem('distribuidor_session', JSON.stringify(session));
       showScreen('main-screen');
       startApp();
@@ -578,7 +597,7 @@ async function renderCityList() {
   // ciudad por ciudad.
   try {
     const res = await apiCall('getResumenCiudades', { distribuidorId: session.id, nombre: session.nombre, ciudades: session.ciudades });
-    cont.querySelectorAll('.city-btn').forEach(b => {
+    cont.querySelectorAll('.city-btn[data-ciudad]').forEach(b => {
       const n = res.counts[b.dataset.ciudad] || 0;
       if (n > 0) {
         b.innerHTML += `<span class="pending-badge">${n}</span>`;
@@ -610,7 +629,7 @@ document.getElementById('btnChangeCity').addEventListener('click', () => {
  *  ARRANQUE DE LA APP PRINCIPAL
  * ==================================================================== */
 async function startApp() {
-  document.getElementById('hdrCiudad').textContent = session.ciudad || 'Todas las ciudades';
+  document.getElementById('hdrCiudad').textContent = session.ciudad || (session.verTodas ? 'Todas las ciudades' : 'Todas mis ciudades');
   document.getElementById('hdrNombre').textContent = session.nombre || '';
   document.getElementById('hdrCorreo').textContent = session.correo;
   document.getElementById('hdrRol').textContent = (session.rol || 'Distribuidor').toUpperCase();
@@ -641,7 +660,7 @@ if (session && !session.rol) {
   localStorage.removeItem('distribuidor_session');
   session = null;
 }
-if (session && (session.ciudad || session.verTodas)) {
+if (session && (session.ciudadElegida || session.verTodas)) {
   showScreen('main-screen');
   startApp();
 } else if (session) {
