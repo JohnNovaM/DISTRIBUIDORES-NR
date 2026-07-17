@@ -458,7 +458,7 @@ const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyduVPZukNIDZwbbknE
 // el CACHE_VERSION de sw.js. Así, si alguien dice "no veo el cambio",
 // le preguntas qué versión le sale arriba y sabes al instante si su
 // navegador tiene código viejo cacheado o si el problema es otro.
-const APP_VERSION = 'v20';
+const APP_VERSION = 'v21';
 document.addEventListener('DOMContentLoaded', () => {
   const lv = document.getElementById('loginVersion');
   if (lv) lv.textContent = APP_VERSION;
@@ -1116,20 +1116,29 @@ function renderRemisionesPorDistribuidor(items, cont, totalesCont) {
   });
   const distribuidoresOrdenados = Object.keys(grupos).sort((a, b) => a.localeCompare(b, 'es'));
   let granTotalDesplaz = 0;
+  // Si ya está filtrado a un solo distribuidor (o solo aparece uno en el
+  // resultado), el encabezado "👤 Nombre" es redundante — ya se sabe de
+  // quién es todo, no aporta nada y solo ocupa espacio.
+  const mostrarEncabezado = distribuidoresOrdenados.length > 1;
 
   distribuidoresOrdenados.forEach(dist => {
     const grupoItems = grupos[dist];
-    const header = document.createElement('div');
-    header.className = 'date-group-header';
     let subtotalDist = 0;
-    if (estadoFiltroActual === 'ENTREGADO') {
+    if (mostrarEncabezado) {
+      const header = document.createElement('div');
+      header.className = 'date-group-header';
+      if (estadoFiltroActual === 'ENTREGADO') {
+        grupoItems.forEach(r => { subtotalDist += Number(r['VLR DESPLAZAMIENTO'] || r['VALOR DESPLAZAMIENTO']) || 0; });
+        granTotalDesplaz += subtotalDist;
+        header.innerHTML = `<span>👤 ${escapeHtml(dist)} · ${grupoItems.length} remisión(es)</span><span>Desplaz: $${formatMoney(subtotalDist)}</span>`;
+      } else {
+        header.innerHTML = `<span>👤 ${escapeHtml(dist)}</span><span>${grupoItems.length} remisión(es)</span>`;
+      }
+      cont.appendChild(header);
+    } else if (estadoFiltroActual === 'ENTREGADO') {
       grupoItems.forEach(r => { subtotalDist += Number(r['VLR DESPLAZAMIENTO'] || r['VALOR DESPLAZAMIENTO']) || 0; });
       granTotalDesplaz += subtotalDist;
-      header.innerHTML = `<span>👤 ${escapeHtml(dist)} · ${grupoItems.length} remisión(es)</span><span>Desplaz: $${formatMoney(subtotalDist)}</span>`;
-    } else {
-      header.innerHTML = `<span>👤 ${escapeHtml(dist)}</span><span>${grupoItems.length} remisión(es)</span>`;
     }
-    cont.appendChild(header);
 
     // Sub-agrupamos por ciudad SOLO si este distribuidor tiene remisiones
     // en más de una ciudad; si es una sola, no aporta mostrar el subtítulo.
