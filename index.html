@@ -640,6 +640,11 @@ async function startApp() {
   if (session.verTodas) {
     await renderDistFilterBar();
     updateHeaderFiltro();
+  } else if (session.ciudades && session.ciudades.length > 1) {
+    // Distribuidor con varias ciudades: filtro rápido arriba (sin
+    // necesidad de ir a la pantalla completa de "cambiar ciudad").
+    document.getElementById('distFilterBar').style.display = 'none';
+    renderCityFilterBarDistribuidor();
   } else {
     document.getElementById('distFilterBar').style.display = 'none';
     document.getElementById('cityFilterBar').style.display = 'none';
@@ -795,6 +800,39 @@ function selectCiudadFiltro(ciudad, chipEl) {
   document.querySelectorAll('#cityFilterBar .city-chip').forEach(c => c.classList.remove('active'));
   chipEl.classList.add('active');
   updateHeaderFiltro();
+  refreshCurrentView();
+}
+
+// Filtro rápido de ciudad para el Distribuidor con varias ciudades a
+// cargo: aparece siempre arriba, sin tener que ir a la pantalla
+// completa de "cambiar ciudad" cada vez que busca algo en otra ciudad.
+function renderCityFilterBarDistribuidor() {
+  const bar = document.getElementById('cityFilterBar');
+  bar.style.display = 'flex';
+  bar.innerHTML = '';
+
+  const chipTodas = document.createElement('div');
+  chipTodas.className = 'city-chip' + (!session.ciudad ? ' active' : '');
+  chipTodas.textContent = '🌎 Todas';
+  chipTodas.onclick = () => selectCiudadFiltroDistribuidor('', chipTodas);
+  bar.appendChild(chipTodas);
+
+  session.ciudades.forEach(c => {
+    const chip = document.createElement('div');
+    chip.className = 'city-chip' + (session.ciudad === c ? ' active' : '');
+    chip.textContent = c;
+    chip.onclick = () => selectCiudadFiltroDistribuidor(c, chip);
+    bar.appendChild(chip);
+  });
+}
+
+function selectCiudadFiltroDistribuidor(ciudad, chipEl) {
+  session.ciudad = ciudad;
+  session.ciudadElegida = true;
+  localStorage.setItem('distribuidor_session', JSON.stringify(session));
+  document.querySelectorAll('#cityFilterBar .city-chip').forEach(c => c.classList.remove('active'));
+  chipEl.classList.add('active');
+  document.getElementById('hdrCiudad').textContent = ciudad || 'Todas mis ciudades';
   refreshCurrentView();
 }
 
