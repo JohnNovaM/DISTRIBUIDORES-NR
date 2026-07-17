@@ -1107,7 +1107,11 @@ function renderRemisionCard(r) {
       window.open(`https://wa.me/?text=${texto}`, '_blank');
     };
     if (!esDistribuidor()) actionsRow.appendChild(btnWa);
-  } else if (puedeGenerarPDF()) {
+  } else {
+    // Nadie generó el PDF todavía: se lo habilitamos a CUALQUIER rol
+    // (incluido el distribuidor) como respaldo, por si a Logística se
+    // le pasó — no arriesga nada, solo convierte a PDF datos que ya
+    // están correctos en la fila.
     const btnPdf = document.createElement('button');
     btnPdf.className = 'small-btn outline';
     btnPdf.textContent = '📄 Generar PDF';
