@@ -252,6 +252,7 @@
     <main id="viewRemisiones" class="view">
       <div class="section-title">
         <span id="tituloRemisiones">Remisiones</span>
+        <button class="small-btn" id="btnNuevaRemision" style="display:none;">+ Nueva</button>
       </div>
       <input type="text" id="buscadorRemision" placeholder="🔍 Buscar por número de remisión...">
       <div class="city-filter-bar" id="estadoFilterBar" style="padding-left:0;padding-right:0;"></div>
@@ -394,6 +395,22 @@
   </div>
 </div>
 
+<!-- ===================== MODAL NUEVAS REMISIONES (Logística/Administrador) ===================== -->
+<div class="modal-overlay" id="modalNuevasOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Nuevas remisiones</h2>
+      <button class="close-x" id="modalNuevasClose">✕</button>
+    </div>
+    <p class="muted">Pega los números de remisión que copiaste de la hoja de ventas — uno por línea, o separados por coma. El sistema busca cada uno directo en la hoja de ventas y trae los datos solo.</p>
+    <label>Números de remisión</label>
+    <textarea id="nuevasRemisionesTexto" placeholder="Ej:&#10;10234&#10;10235&#10;10236" style="min-height:120px;"></textarea>
+    <button class="primary" id="btnCrearRemisionesMasivo">Crear remisiones</button>
+    <p class="error-msg" id="nuevasRemisionesError"></p>
+    <div id="nuevasRemisionesResultado"></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -437,6 +454,7 @@ function rolUpper() { return session && session.rol ? String(session.rol).toUppe
 function esDistribuidor() { return rolUpper() === 'DISTRIBUIDOR'; }
 function esGerencia() { return rolUpper() === 'GERENCIA'; }
 function puedeGenerarPDF() { return ['ADMINISTRADOR', 'LOGISTICA'].indexOf(rolUpper()) !== -1; }
+function puedeCrearRemision() { return ['ADMINISTRADOR', 'LOGISTICA'].indexOf(rolUpper()) !== -1; }
 function puedeConfirmarCartera() { return ['ADMINISTRADOR', 'CARTERA'].indexOf(rolUpper()) !== -1; }
 function puedeExportarExcel() { return ['ADMINISTRADOR', 'CARTERA'].indexOf(rolUpper()) !== -1; }
 function puedeCrearConsignacion() { return rolUpper() === 'DISTRIBUIDOR'; }
@@ -608,6 +626,7 @@ async function startApp() {
 
   document.getElementById('consignarFormWrap').style.display = puedeCrearConsignacion() ? 'block' : 'none';
   document.getElementById('exportExcelWrap').style.display = puedeExportarExcel() ? 'block' : 'none';
+  document.getElementById('btnNuevaRemision').style.display = puedeCrearRemision() ? 'inline-block' : 'none';
 
   refreshCurrentView();
   startAutoRefresh();
@@ -830,6 +849,33 @@ function renderEstadoFilterBar() {
   });
 }
 
+document.getElementById('btnNuevaRemision').addEventListener('click', () => {
+  document.getElementById('nuevasRemisionesTexto').value = '';
+  document.getElementById('nuevasRemisionesError').style.display = 'none';
+  document.getElementById('nuevasRemisionesResultado').innerHTML = '';
+  document.getElementById('modalNuevasOverlay').classList.add('active');
+});
+document.getElementById('modalNuevasClose').addEventListener('click', () => document.getElementById('modalNuevasOverlay').classList.remove('active'));
+document.getElementById('btnCrearRemisionesMasivo').addEventListener('click', async () => {
+  const texto = document.getElementById('nuevasRemisionesTexto').value;
+  const errEl = document.getElementById('nuevasRemisionesError');
+  const resEl = document.getElementById('nuevasRemisionesResultado');
+  errEl.style.display = 'none';
+  resEl.innerHTML = '';
+  if (!texto.trim()) { errEl.textContent = 'Pega al menos un número de remisión'; errEl.style.display = 'block'; return; }
+  const btn = document.getElementById('btnCrearRemisionesMasivo');
+  btn.innerHTML = '<span class="spinner"></span>Buscando y creando...';
+  try {
+    const res = await apiCall('crearRemisionesMasivo', { numeros: texto });
+    let html = `<div class="success-msg" style="display:block;">✅ ${res.creadas} remisión(es) creada(s) correctamente.</div>`;
+    if (res.duplicadas.length) html += `<p class="muted">Ya existían (se omitieron): ${res.duplicadas.join(', ')}</p>`;
+    if (res.noEncontradas.length) html += `<p class="error-msg" style="display:block;">No se encontraron en ventas: ${res.noEncontradas.join(', ')}</p>`;
+    resEl.innerHTML = html;
+    loadRemisiones();
+  } catch (e) { errEl.textContent = e.message; errEl.style.display = 'block'; }
+  finally { btn.innerHTML = 'Crear remisiones'; }
+});
+
 async function loadRemisiones() {
   const res = await apiCall('getRemisiones', {
     distribuidorId: session.id, nombre: session.nombre, ciudad: session.ciudad,
@@ -1008,13 +1054,30 @@ function renderRemisionCard(r) {
     card.addEventListener('click', () => openModalRemision(r));
   }
 
-  if (puedeGenerarPDF()) {
+  // Ver el PDF: cualquiera lo puede abrir si ya existe. Generarlo (la
+  // primera vez) solo Logística/Administrador.
+  if (r['PDF REMISION']) {
     const btnPdf = document.createElement('button');
     btnPdf.className = 'small-btn outline';
-    btnPdf.textContent = r['PDF REMISION'] ? '📄 Ver PDF' : '📄 Generar PDF';
+    btnPdf.textContent = '📄 Ver PDF';
+    btnPdf.onclick = (ev) => { ev.stopPropagation(); window.open(r['PDF REMISION'], '_blank'); };
+    actionsRow.appendChild(btnPdf);
+
+    const btnWa = document.createElement('button');
+    btnWa.className = 'small-btn outline';
+    btnWa.textContent = '📲 WhatsApp';
+    btnWa.onclick = (ev) => {
+      ev.stopPropagation();
+      const texto = encodeURIComponent(`Hola, aquí tienes el PDF de la remisión ${r['REMISION']}: ${r['PDF REMISION']}`);
+      window.open(`https://wa.me/?text=${texto}`, '_blank');
+    };
+    actionsRow.appendChild(btnWa);
+  } else if (puedeGenerarPDF()) {
+    const btnPdf = document.createElement('button');
+    btnPdf.className = 'small-btn outline';
+    btnPdf.textContent = '📄 Generar PDF';
     btnPdf.onclick = async (ev) => {
       ev.stopPropagation();
-      if (r['PDF REMISION']) { window.open(r['PDF REMISION'], '_blank'); return; }
       btnPdf.innerHTML = '<span class="spinner"></span>';
       try {
         const res2 = await apiCall('generarPDF', { row: r.__row });
