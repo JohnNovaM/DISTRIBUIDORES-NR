@@ -233,6 +233,7 @@
       <img src="logo.png" alt="Natural Resvex" class="logo">
       <h1>Natural Resvex</h1>
       <p class="sub">Ingresa con tu correo y contraseña</p>
+      <p class="muted" style="text-align:center;font-size:10px;margin:0 0 10px;" id="loginVersion"></p>
       <label>Correo</label>
       <input type="email" id="loginCorreo" placeholder="correo@ejemplo.com" autocomplete="username">
       <label>Contraseña</label>
@@ -257,6 +258,7 @@
         <span class="mail" id="hdrNombre">Nombre</span>
         <span class="mail" id="hdrCorreo">correo@ejemplo.com</span>
         <span class="rolbadge" id="hdrRol">ROL</span>
+        <span class="mail" id="hdrVersion" style="opacity:.6;font-size:9.5px;"></span>
       </div>
       <div class="actions">
         <button class="icon-btn" id="btnChangeCity" title="Cambiar ciudad">Ciudad</button>
@@ -451,6 +453,16 @@
  *  (termina en /exec). La obtienes al implementar Code.gs.
  * ==================================================================== */
 const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyduVPZukNIDZwbbknE_xRNEazmEyOh5-dtbwCUaZgqsDooPPzjmTR1vyX64eATuQE01w/exec';
+
+// Sube este número cada vez que subas un index.html nuevo — junto con
+// el CACHE_VERSION de sw.js. Así, si alguien dice "no veo el cambio",
+// le preguntas qué versión le sale arriba y sabes al instante si su
+// navegador tiene código viejo cacheado o si el problema es otro.
+const APP_VERSION = 'v20';
+document.addEventListener('DOMContentLoaded', () => {
+  const lv = document.getElementById('loginVersion');
+  if (lv) lv.textContent = APP_VERSION;
+});
 
 /* ======================================================================
  *  TABS VISIBLES POR ROL
@@ -663,6 +675,7 @@ async function startApp() {
   document.getElementById('hdrNombre').textContent = session.nombre || '';
   document.getElementById('hdrCorreo').textContent = session.correo;
   document.getElementById('hdrRol').textContent = (session.rol || 'Distribuidor').toUpperCase();
+  document.getElementById('hdrVersion').textContent = APP_VERSION;
   document.getElementById('tabbar').style.display = 'flex';
 
   renderTabsForRole();

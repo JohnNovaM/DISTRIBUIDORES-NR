@@ -12,7 +12,7 @@
  *    la versión vieja de la app aunque tú ya hayas subido cambios.
  ***********************************************************************/
 
-var CACHE_VERSION = 'v18';
+var CACHE_VERSION = 'v20';
 var CACHE_NAME = 'natural-resvex-' + CACHE_VERSION;
 
 // Archivos del "cascarón" de la app (shell): lo mínimo para que la
@@ -98,22 +98,19 @@ self.addEventListener('fetch', function (event) {
   }
 
   // 3) Archivos propios de la app (HTML, manifest, íconos, logo):
-  //    caché primero (carga instantánea), y en segundo plano se
-  //    actualiza el caché con la versión más reciente de la red.
+  //    RED PRIMERO — así, apenas hay conexión (que es casi siempre),
+  //    la persona ve tus cambios nuevos desde el primer abrir, no
+  //    hasta la segunda visita. El caché solo se usa como respaldo si
+  //    de verdad no hay internet en ese momento.
   event.respondWith(
-    caches.match(event.request).then(function (enCache) {
-      var fetchPromise = fetch(event.request).then(function (respuesta) {
-        if (respuesta && respuesta.ok) {
-          var copia = respuesta.clone();
-          caches.open(CACHE_NAME).then(function (cache) { cache.put(event.request, copia); });
-        }
-        return respuesta;
-      }).catch(function () {
-        // Sin internet y sin copia en caché: no hay nada que devolver.
-        return enCache;
-      });
-
-      return enCache || fetchPromise;
+    fetch(event.request).then(function (respuesta) {
+      if (respuesta && respuesta.ok) {
+        var copia = respuesta.clone();
+        caches.open(CACHE_NAME).then(function (cache) { cache.put(event.request, copia); });
+      }
+      return respuesta;
+    }).catch(function () {
+      return caches.match(event.request);
     })
   );
 });
