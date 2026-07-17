@@ -254,6 +254,8 @@
         <span id="tituloRemisiones">Remisiones</span>
         <button class="small-btn" id="btnNuevaRemision" style="display:none;">+ Nueva</button>
       </div>
+      <button class="small-btn outline" id="btnGenerarPDFsPendientes" style="display:none;width:100%;margin-bottom:10px;">📄 Generar PDFs pendientes</button>
+      <p class="muted" id="pdfProgreso" style="display:none;"></p>
       <input type="text" id="buscadorRemision" placeholder="🔍 Buscar por número de remisión...">
       <div class="city-filter-bar" id="estadoFilterBar" style="padding-left:0;padding-right:0;"></div>
       <div id="remisionesTotales"></div>
@@ -627,6 +629,7 @@ async function startApp() {
   document.getElementById('consignarFormWrap').style.display = puedeCrearConsignacion() ? 'block' : 'none';
   document.getElementById('exportExcelWrap').style.display = puedeExportarExcel() ? 'block' : 'none';
   document.getElementById('btnNuevaRemision').style.display = puedeCrearRemision() ? 'inline-block' : 'none';
+  document.getElementById('btnGenerarPDFsPendientes').style.display = puedeGenerarPDF() ? 'block' : 'none';
 
   refreshCurrentView();
   startAutoRefresh();
@@ -848,6 +851,38 @@ function renderEstadoFilterBar() {
     bar.appendChild(chip);
   });
 }
+
+document.getElementById('btnGenerarPDFsPendientes').addEventListener('click', async () => {
+  const btn = document.getElementById('btnGenerarPDFsPendientes');
+  const progreso = document.getElementById('pdfProgreso');
+  btn.disabled = true;
+  progreso.style.display = 'block';
+  progreso.textContent = 'Buscando remisiones sin PDF...';
+  try {
+    const res = await apiCall('getRemisiones', {
+      distribuidorId: session.id, nombre: session.nombre, ciudad: session.ciudad,
+      verTodas: !!session.verTodas, filtroDistribuidorId: session.filtroDistId, filtroDistribuidorNombre: session.filtroDistNombre,
+      soloPendientes: false
+    });
+    const sinPdf = res.remisiones.filter(r => !r['PDF REMISION']);
+    if (!sinPdf.length) { progreso.textContent = 'No hay remisiones pendientes de PDF.'; btn.disabled = false; return; }
+
+    let ok = 0, fallidas = 0;
+    for (let i = 0; i < sinPdf.length; i++) {
+      progreso.textContent = `Generando PDF ${i + 1} de ${sinPdf.length} (remisión ${sinPdf[i]['REMISION']})...`;
+      try {
+        await apiCall('generarPDF', { row: sinPdf[i].__row });
+        ok++;
+      } catch (e) { fallidas++; }
+    }
+    progreso.textContent = `Listo: ${ok} PDF generado(s)${fallidas ? `, ${fallidas} con error` : ''}.`;
+    loadRemisiones();
+  } catch (e) {
+    progreso.textContent = 'Error: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
 
 document.getElementById('btnNuevaRemision').addEventListener('click', () => {
   document.getElementById('nuevasRemisionesTexto').value = '';
@@ -1071,7 +1106,7 @@ function renderRemisionCard(r) {
       const texto = encodeURIComponent(`Hola, aquí tienes el PDF de la remisión ${r['REMISION']}: ${r['PDF REMISION']}`);
       window.open(`https://wa.me/?text=${texto}`, '_blank');
     };
-    actionsRow.appendChild(btnWa);
+    if (!esDistribuidor()) actionsRow.appendChild(btnWa);
   } else if (puedeGenerarPDF()) {
     const btnPdf = document.createElement('button');
     btnPdf.className = 'small-btn outline';
