@@ -135,9 +135,16 @@
   nav.tabbar button{
     flex:1;background:none;border:none;padding:10px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:3px;
     color:var(--muted);font-size:10.5px;cursor:pointer;font-weight:600;position:relative;
+    margin:6px 4px;border-radius:12px;transition:background-color .15s, box-shadow .15s;
   }
   nav.tabbar button .ic{font-size:19px;}
-  nav.tabbar button.active{color:var(--primary);}
+  nav.tabbar button.active{
+    color:var(--primary);background:#eef3f9;box-shadow:0 1px 4px rgba(44,102,153,.18);
+  }
+  nav.tabbar button.active::before{
+    content:'';position:absolute;top:-6px;left:50%;transform:translateX(-50%);
+    width:22px;height:3px;border-radius:3px;background:var(--primary);
+  }
 
   /* ---- Modal ---- */
   .modal-overlay{
@@ -458,7 +465,7 @@ const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyduVPZukNIDZwbbknE
 // el CACHE_VERSION de sw.js. Así, si alguien dice "no veo el cambio",
 // le preguntas qué versión le sale arriba y sabes al instante si su
 // navegador tiene código viejo cacheado o si el problema es otro.
-const APP_VERSION = 'v21';
+const APP_VERSION = 'v22';
 document.addEventListener('DOMContentLoaded', () => {
   const lv = document.getElementById('loginVersion');
   if (lv) lv.textContent = APP_VERSION;
