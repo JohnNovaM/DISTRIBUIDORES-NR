@@ -139,7 +139,7 @@
   }
   nav.tabbar button .ic{font-size:19px;}
   nav.tabbar button.active{
-    color:var(--primary);background:#eef3f9;box-shadow:0 1px 4px rgba(44,102,153,.18);
+    color:var(--primary);background:#eef3f9;box-shadow:0 2px 7px rgba(44,102,153,.35);
   }
   nav.tabbar button.active::before{
     content:'';position:absolute;top:-6px;left:50%;transform:translateX(-50%);
@@ -313,6 +313,10 @@
         <div class="section-title">Reportar consignación</div>
         <label>Remisiones que incluye esta consignación *</label>
         <div class="checklist" id="checklistRemisiones"></div>
+        <div class="total-box" id="valorAConsignarBox" style="display:none;">
+          <span>Valor a consignar (según lo marcado)</span>
+          <span id="valorAConsignarTexto">$0</span>
+        </div>
         <label>Fecha de la consignación *</label>
         <input type="date" id="consFechas">
         <label>Valor consignado *</label>
@@ -465,7 +469,7 @@ const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyduVPZukNIDZwbbknE
 // el CACHE_VERSION de sw.js. Así, si alguien dice "no veo el cambio",
 // le preguntas qué versión le sale arriba y sabes al instante si su
 // navegador tiene código viejo cacheado o si el problema es otro.
-const APP_VERSION = 'v22';
+const APP_VERSION = 'v23';
 document.addEventListener('DOMContentLoaded', () => {
   const lv = document.getElementById('loginVersion');
   if (lv) lv.textContent = APP_VERSION;
@@ -1367,19 +1371,41 @@ async function loadConsignarView() {
     const res = await apiCall('getPendientes', { distribuidorId: session.id, nombre: session.nombre, ciudad: session.ciudad, verTodas: !!session.verTodas, filtroDistribuidorId: session.filtroDistId, filtroDistribuidorNombre: session.filtroDistNombre });
     pendConsignacionesCache = res.consignacionesPendientes;
     const cont = document.getElementById('checklistRemisiones');
+
+    // Antes de reconstruir, guardamos qué filas estaban marcadas —
+    // así el auto-refresh no borra la selección a medio camino.
+    const marcadasAntes = new Set(Array.from(cont.querySelectorAll('input:checked')).map(el => el.value));
+
     cont.innerHTML = '';
     if (!pendConsignacionesCache.length) {
       cont.innerHTML = '<div class="empty-state">No hay remisiones entregadas pendientes de consignar</div>';
     } else {
       pendConsignacionesCache.forEach(r => {
         const lab = document.createElement('label');
-        lab.innerHTML = `<input type="checkbox" value="${r.__row}" data-remision="${escapeHtml(r['REMISION'])}">
+        lab.innerHTML = `<input type="checkbox" value="${r.__row}" data-remision="${escapeHtml(r['REMISION'])}" data-valor="${Number(r['VLR REMISION']) || 0}">
           Remisión ${escapeHtml(r['REMISION'])} — $${formatMoney(r['VLR REMISION'])}`;
+        const chk = lab.querySelector('input');
+        if (marcadasAntes.has(String(r.__row))) chk.checked = true;
+        chk.addEventListener('change', actualizarValorAConsignar);
         cont.appendChild(lab);
       });
     }
+    actualizarValorAConsignar();
   }
   await loadConsignacionesHistorial();
+}
+
+// Suma en vivo el valor de las remisiones marcadas — solo informativo,
+// no reemplaza el campo "Valor consignado" que llena el distribuidor
+// (por si el banco cobra alguna comisión o hay alguna diferencia).
+function actualizarValorAConsignar() {
+  const box = document.getElementById('valorAConsignarBox');
+  const marcadas = document.querySelectorAll('#checklistRemisiones input:checked');
+  if (!marcadas.length) { box.style.display = 'none'; return; }
+  let total = 0;
+  marcadas.forEach(el => { total += Number(el.dataset.valor) || 0; });
+  document.getElementById('valorAConsignarTexto').textContent = '$' + formatMoney(total);
+  box.style.display = 'flex';
 }
 
 async function loadConsignacionesHistorial() {
@@ -1412,11 +1438,16 @@ function renderConsignacionCard(c, opciones) {
     ? `<a href="${c['FOTO']}" target="_blank" rel="noopener"><img src="${c['FOTO']}" style="max-width:100%;border-radius:10px;margin-top:8px;display:block;" alt="Comprobante"></a>`
     : '<div class="muted" style="margin-top:8px;">⚠️ Sin foto de comprobante</div>';
 
+  const valorEsperado = Number(c['VALOR A CONSIGNAR']) || 0;
+  const valorReal = Number(c['VALOR CONSIGNADO']) || 0;
+  const noCuadra = valorEsperado > 0 && valorEsperado !== valorReal;
+
   card.innerHTML = `
     <div class="row"><strong>Consignación #${escapeHtml(c['ID CONSIGNACIONES'])}</strong><span class="badge ${badgeClass}">${escapeHtml(estado)}</span></div>
     ${!esDistribuidor() ? '<div class="muted">Distribuidor: ' + escapeHtml(c['ID DISTRIBUIDOR']) + ' · ' + escapeHtml(c['CIUDAD']) + '</div>' : ''}
     <div class="muted">Remisiones: ${escapeHtml(c['REMISIONES QUE CONSIGNA'] || '-')}</div>
-    <div class="muted">Valor: $${formatMoney(c['VALOR CONSIGNADO'])} · Fecha: ${escapeHtml(formatVal(c['FECHAS DE ENTREGAS QUE CONSIGNA']))}</div>
+    <div class="muted">Fecha: ${escapeHtml(formatVal(c['FECHAS DE ENTREGAS QUE CONSIGNA']))}</div>
+    <div class="muted">A consignar: $${formatMoney(valorEsperado)} · Consignado: <strong style="color:${noCuadra ? 'var(--danger)' : 'var(--text)'}">$${formatMoney(valorReal)}</strong>${noCuadra ? ' ⚠️ no cuadra' : ''}</div>
     ${c['OBSERVACIONES'] ? '<div class="muted">Nota del distribuidor: ' + escapeHtml(c['OBSERVACIONES']) + '</div>' : ''}
     ${fotoHtml}
   `;
