@@ -469,7 +469,7 @@ const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyduVPZukNIDZwbbknE
 // el CACHE_VERSION de sw.js. Así, si alguien dice "no veo el cambio",
 // le preguntas qué versión le sale arriba y sabes al instante si su
 // navegador tiene código viejo cacheado o si el problema es otro.
-const APP_VERSION = 'v23';
+const APP_VERSION = 'v25';
 document.addEventListener('DOMContentLoaded', () => {
   const lv = document.getElementById('loginVersion');
   if (lv) lv.textContent = APP_VERSION;
@@ -1639,7 +1639,9 @@ const CATEGORIAS_PENDIENTES = [
   { key: 'consignacionesPendientes', icon: '💵', label: 'Sin consignar', badge: 'entregado', badgeTexto: 'Entregado',
     montoCampo: 'VLR REMISION', soloRoles: null },
   { key: 'pendientesConfirmacionCartera', icon: '🏦', label: 'Por confirmar', badge: 'entregado', badgeTexto: 'Entregado',
-    montoCampo: 'VALOR CONSIGNADO', soloRoles: 'cartera' }
+    montoCampo: 'VALOR CONSIGNADO', soloRoles: 'cartera' },
+  { key: 'pagosElectronicosPendientes', icon: '💳', label: 'Pagos electrónicos', badge: 'entregado', badgeTexto: 'Entregado',
+    montoCampo: 'VLR REMISION', soloRoles: 'cartera' }
 ];
 
 async function loadPendientes() {
@@ -1705,6 +1707,27 @@ function renderDetalleCategoria() {
   lista.forEach(r => {
     if (cat.key === 'pendientesConfirmacionCartera') {
       cont.appendChild(renderConsignacionCard(r, { onUpdate: loadPendientes }));
+      return;
+    }
+    if (cat.key === 'pagosElectronicosPendientes') {
+      const card = document.createElement('div');
+      card.className = 'card';
+      const extra = !esDistribuidor() ? `<div class="muted">Distribuidor: ${escapeHtml(r['ID DISTRIBUIDOR'])} · ${escapeHtml(r['ID CIUDAD'])}</div>` : '';
+      card.innerHTML = `
+        <div class="row"><strong>Remisión ${escapeHtml(r['REMISION'])}</strong><span class="badge entregado">${escapeHtml(r['FORMA DE PAGO'] || '')}</span></div>
+        ${extra}
+        <div class="muted">Fecha: ${escapeHtml(formatVal(r['FECHA']))} · Valor: $${formatMoney(r['VLR REMISION'])}</div>
+        <div class="cartera-check"><input type="checkbox"> <span>Confirmar pago visto en banco</span></div>
+      `;
+      const chk = card.querySelector('input');
+      chk.addEventListener('change', async () => {
+        try {
+          await apiCall('confirmarPagoElectronico', { row: r.__row, confirmado: chk.checked });
+          toast('Confirmado');
+          loadPendientes();
+        } catch (e) { toast('Error: ' + e.message); chk.checked = false; }
+      });
+      cont.appendChild(card);
       return;
     }
     const card = document.createElement('div');
@@ -1840,13 +1863,26 @@ function escapeHtml(v) {
 function formatMoney(v) { const n = Number(v) || 0; return n.toLocaleString('es-CO'); }
 function formatVal(v) {
   if (!v) return '-';
+  const texto = String(v).trim();
+  // Texto tipo "2026-07-18..." (con o sin hora): tomamos los números
+  // directo del texto. Nunca creamos un objeto Date desde un string de
+  // fecha aquí — ahí es exactamente donde una fecha se corre un día
+  // para atrás (JS interpreta "2026-07-18" como medianoche UTC, y al
+  // mostrarla en hora de Colombia cae en el día anterior).
+  let m = texto.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+  m = texto.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return texto; // ya viene en dd/MM/yyyy
   if (v instanceof Date) return v.toLocaleDateString('es-CO');
   const d = new Date(v);
-  if (!isNaN(d.getTime()) && String(v).length > 8) return d.toLocaleDateString('es-CO');
-  return String(v);
+  if (!isNaN(d.getTime()) && texto.length > 8) return d.toLocaleDateString('es-CO');
+  return texto;
 }
 function formatValISO(v) {
   if (!v) return '';
+  const texto = String(v).trim();
+  const m = texto.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
   const d = (v instanceof Date) ? v : new Date(v);
   if (isNaN(d.getTime())) return '';
   const pad = n => String(n).padStart(2, '0');
