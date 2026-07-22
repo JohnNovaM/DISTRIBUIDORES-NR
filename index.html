@@ -490,7 +490,7 @@ const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyduVPZukNIDZwbbknE
 // el CACHE_VERSION de sw.js. Así, si alguien dice "no veo el cambio",
 // le preguntas qué versión le sale arriba y sabes al instante si su
 // navegador tiene código viejo cacheado o si el problema es otro.
-const APP_VERSION = 'v26';
+const APP_VERSION = 'v27';
 document.addEventListener('DOMContentLoaded', () => {
   const lv = document.getElementById('loginVersion');
   if (lv) lv.textContent = APP_VERSION;
@@ -941,24 +941,39 @@ function selectCiudadFiltro(ciudad, chipEl) {
 // Filtro rápido de ciudad para el Distribuidor con varias ciudades a
 // cargo: aparece siempre arriba, sin tener que ir a la pantalla
 // completa de "cambiar ciudad" cada vez que busca algo en otra ciudad.
-function renderCityFilterBarDistribuidor() {
+async function renderCityFilterBarDistribuidor() {
   const bar = document.getElementById('cityFilterBar');
   bar.style.display = 'flex';
   bar.innerHTML = '';
 
   const chipTodas = document.createElement('div');
   chipTodas.className = 'city-chip' + (!session.ciudad ? ' active' : '');
-  chipTodas.textContent = '🌎 Todas';
+  chipTodas.innerHTML = '🌎 Todas';
   chipTodas.onclick = () => selectCiudadFiltroDistribuidor('', chipTodas);
   bar.appendChild(chipTodas);
 
   session.ciudades.forEach(c => {
     const chip = document.createElement('div');
     chip.className = 'city-chip' + (session.ciudad === c ? ' active' : '');
+    chip.dataset.ciudad = c;
     chip.textContent = c;
     chip.onclick = () => selectCiudadFiltroDistribuidor(c, chip);
     bar.appendChild(chip);
   });
+
+  // Mismo conteo de pendientes por ciudad que ya traíamos en la
+  // pantalla completa — para no perder esa información al pasar al
+  // filtro rápido de arriba.
+  try {
+    const res = await apiCall('getResumenCiudades', { distribuidorId: session.id, nombre: session.nombre, ciudades: session.ciudades });
+    let total = 0;
+    Object.values(res.counts).forEach(n => { total += n || 0; });
+    if (total > 0) chipTodas.innerHTML = `🌎 Todas <span class="chip-badge">${total}</span>`;
+    bar.querySelectorAll('.city-chip[data-ciudad]').forEach(chip => {
+      const n = res.counts[chip.dataset.ciudad] || 0;
+      if (n > 0) chip.innerHTML = `${escapeHtml(chip.dataset.ciudad)} <span class="chip-badge">${n}</span>`;
+    });
+  } catch (e) { /* si falla el conteo, igual se puede elegir la ciudad */ }
 }
 
 function selectCiudadFiltroDistribuidor(ciudad, chipEl) {
