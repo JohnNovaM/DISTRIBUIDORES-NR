@@ -490,7 +490,7 @@ const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyduVPZukNIDZwbbknE
 // el CACHE_VERSION de sw.js. Así, si alguien dice "no veo el cambio",
 // le preguntas qué versión le sale arriba y sabes al instante si su
 // navegador tiene código viejo cacheado o si el problema es otro.
-const APP_VERSION = 'v27';
+const APP_VERSION = 'v28';
 document.addEventListener('DOMContentLoaded', () => {
   const lv = document.getElementById('loginVersion');
   if (lv) lv.textContent = APP_VERSION;
@@ -850,7 +850,7 @@ async function renderDistFilterBar() {
   try {
     const [res, resumen] = await Promise.all([
       apiCall('getDistribuidores', {}),
-      apiCall('getResumenGlobal', {})
+      apiCall('getResumenGlobal', { ciudad: session.ciudad, filtroDistribuidorId: session.filtroDistId, filtroDistribuidorNombre: session.filtroDistNombre })
     ]);
     distribuidoresCache = res.distribuidores;
     resumenGlobalCache = resumen;
@@ -883,15 +883,16 @@ function updateHeaderFiltro() {
   document.getElementById('hdrCiudad').textContent = parte1 + ' · ' + parte2;
 }
 
+// Al cambiar cualquiera de los dos filtros, se recalcula TODO desde el
+// servidor (ambas filas de badges) — así nunca se queda un numerito
+// desactualizado de la combinación anterior de filtros.
 function selectDistribuidorFiltro(distId, distNombre, chipEl) {
   session.filtroDistId = distId;
   session.filtroDistNombre = distNombre;
   session.ciudad = ''; // al cambiar de distribuidor, reiniciamos el sub-filtro de ciudad
   localStorage.setItem('distribuidor_session', JSON.stringify(session));
-  document.querySelectorAll('#distFilterBar .city-chip').forEach(c => c.classList.remove('active'));
-  chipEl.classList.add('active');
   updateHeaderFiltro();
-  renderCityFilterBar();
+  renderDistFilterBar();
   refreshCurrentView();
 }
 
@@ -932,9 +933,8 @@ async function renderCityFilterBar() {
 function selectCiudadFiltro(ciudad, chipEl) {
   session.ciudad = ciudad;
   localStorage.setItem('distribuidor_session', JSON.stringify(session));
-  document.querySelectorAll('#cityFilterBar .city-chip').forEach(c => c.classList.remove('active'));
-  chipEl.classList.add('active');
   updateHeaderFiltro();
+  renderDistFilterBar();
   refreshCurrentView();
 }
 
