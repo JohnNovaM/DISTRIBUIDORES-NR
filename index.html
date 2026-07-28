@@ -213,11 +213,11 @@
  *  se ensancha y aprovecha el espacio con más columnas.
  * ==================================================================== */
 @media (min-width: 900px) {
-  #app{max-width:1080px;}
-  nav.tabbar{max-width:1080px;}
-  main{padding:20px 32px;}
-  .refresh-bar, .city-filter-bar{padding-left:32px;padding-right:32px;}
-  header.appbar{padding:16px 32px;}
+  #app{max-width:1320px;}
+  nav.tabbar{max-width:1320px;}
+  main{padding:20px 36px;}
+  .refresh-bar, .city-filter-bar{padding-left:36px;padding-right:36px;}
+  header.appbar{padding:16px 36px;}
 
   .kpi-grid{grid-template-columns:repeat(4, 1fr);}
   .product-grid{grid-template-columns:repeat(4, 1fr);}
@@ -228,14 +228,26 @@
   .modal{max-width:640px;border-radius:20px;max-height:85vh;}
 
   /* Las tarjetas de listas largas (remisiones, consignaciones, stock)
-     se acomodan en 2 columnas para no dejar tanto espacio vacío. */
+     se acomodan en varias columnas para no dejar tanto espacio vacío. */
   #remisionesList, #consignacionesList, #pendEntregas, #pendConsignaciones, #pendientesDetalle{
-    display:grid;grid-template-columns:1fr 1fr;gap:12px;align-content:start;
+    display:grid;grid-template-columns:repeat(2, 1fr);gap:12px;align-content:start;
   }
   #remisionesList .card, #consignacionesList .card, #pendEntregas .card, #pendConsignaciones .card, #pendientesDetalle .card{margin-bottom:0;}
   .date-group-header, .detalle-header{grid-column:1 / -1;}
 
   .login-box{max-width:420px;}
+}
+
+/* Pantallas muy grandes (monitores anchos): un poco más de aire y una
+   tercera columna en las listas largas. */
+@media (min-width: 1400px) {
+  #app{max-width:1600px;}
+  nav.tabbar{max-width:1600px;}
+  .kpi-grid{grid-template-columns:repeat(5, 1fr);}
+  .product-grid{grid-template-columns:repeat(5, 1fr);}
+  #remisionesList, #consignacionesList, #pendEntregas, #pendConsignaciones, #pendientesDetalle{
+    grid-template-columns:repeat(3, 1fr);
+  }
 }
 </style>
 </head>
@@ -490,7 +502,7 @@ const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyduVPZukNIDZwbbknE
 // el CACHE_VERSION de sw.js. Así, si alguien dice "no veo el cambio",
 // le preguntas qué versión le sale arriba y sabes al instante si su
 // navegador tiene código viejo cacheado o si el problema es otro.
-const APP_VERSION = 'v28';
+const APP_VERSION = 'v29';
 document.addEventListener('DOMContentLoaded', () => {
   const lv = document.getElementById('loginVersion');
   if (lv) lv.textContent = APP_VERSION;
@@ -1285,9 +1297,8 @@ function renderRemisionCard(r) {
   const badgeClass = estado ? (estado.toLowerCase() === 'entregado' ? 'entregado' : estado.toLowerCase() === 'caído' || estado.toLowerCase() === 'caido' ? 'caido' : 'reprogramado') : 'pendiente';
   const card = document.createElement('div');
   card.className = 'card';
-  let extra = '';
+  let extra = '<div class="muted">Ciudad: ' + escapeHtml(r['ID CIUDAD']) + '</div>';
   if (!esDistribuidor()) {
-    extra += '<div class="muted">Ciudad: ' + escapeHtml(r['ID CIUDAD']) + '</div>';
     extra += '<div class="muted">Cliente: ' + escapeHtml(r['NOMBRE']) + '</div>';
   }
   card.innerHTML = `
