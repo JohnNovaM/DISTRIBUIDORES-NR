@@ -502,7 +502,7 @@ const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyduVPZukNIDZwbbknE
 // el CACHE_VERSION de sw.js. Así, si alguien dice "no veo el cambio",
 // le preguntas qué versión le sale arriba y sabes al instante si su
 // navegador tiene código viejo cacheado o si el problema es otro.
-const APP_VERSION = 'v29';
+const APP_VERSION = 'v30';
 document.addEventListener('DOMContentLoaded', () => {
   const lv = document.getElementById('loginVersion');
   if (lv) lv.textContent = APP_VERSION;
@@ -544,6 +544,7 @@ function esGerencia() { return rolUpper() === 'GERENCIA'; }
 function puedeGenerarPDF() { return ['ADMINISTRADOR', 'LOGISTICA'].indexOf(rolUpper()) !== -1; }
 function puedeCrearRemision() { return ['ADMINISTRADOR', 'LOGISTICA'].indexOf(rolUpper()) !== -1; }
 function puedeConfirmarCartera() { return ['ADMINISTRADOR', 'CARTERA'].indexOf(rolUpper()) !== -1; }
+function puedeVerPagosElectronicos() { return ['ADMINISTRADOR', 'CARTERA', 'GERENCIA', 'LOGISTICA'].indexOf(rolUpper()) !== -1; }
 function puedeExportarExcel() { return ['ADMINISTRADOR', 'CARTERA'].indexOf(rolUpper()) !== -1; }
 function puedeCrearConsignacion() { return rolUpper() === 'DISTRIBUIDOR'; }
 
@@ -1748,7 +1749,7 @@ const CATEGORIAS_PENDIENTES = [
   { key: 'pendientesConfirmacionCartera', icon: '🏦', label: 'Por confirmar', badge: 'entregado', badgeTexto: 'Entregado',
     montoCampo: 'VALOR CONSIGNADO', soloRoles: 'cartera' },
   { key: 'pagosElectronicosPendientes', icon: '💳', label: 'Pagos electrónicos', badge: 'entregado', badgeTexto: 'Entregado',
-    montoCampo: 'VLR REMISION', soloRoles: 'cartera' }
+    montoCampo: 'VLR REMISION', soloRoles: 'pagos_electronicos' }
 ];
 
 async function loadPendientes() {
@@ -1761,6 +1762,7 @@ async function loadPendientes() {
   let totalBadge = 0;
   CATEGORIAS_PENDIENTES.forEach(cat => {
     if (cat.soloRoles === 'cartera' && !puedeConfirmarCartera()) return;
+    if (cat.soloRoles === 'pagos_electronicos' && !puedeVerPagosElectronicos()) return;
     const lista = res[cat.key] || [];
     const total = lista.reduce((s, r) => s + (Number(r[cat.montoCampo]) || 0), 0);
     if (cat.key !== 'pendientesConfirmacionCartera') totalBadge += lista.length; // el badge de la pestaña no cuenta "por confirmar" para no duplicar con Consignar
@@ -1790,8 +1792,11 @@ async function loadPendientes() {
 // tarjeta tocada) sin repetir la llamada al servidor.
 function renderPendientesDashboard() {
   const grid = document.getElementById('kpiGrid');
+  const cats = CATEGORIAS_PENDIENTES.filter(c =>
+    (c.soloRoles !== 'cartera' || puedeConfirmarCartera()) &&
+    (c.soloRoles !== 'pagos_electronicos' || puedeVerPagosElectronicos())
+  );
   Array.from(grid.children).forEach((card, i) => {
-    const cats = CATEGORIAS_PENDIENTES.filter(c => c.soloRoles !== 'cartera' || puedeConfirmarCartera());
     card.classList.toggle('active', categoriaAbierta === cats[i].key);
   });
   renderDetalleCategoria();
@@ -1820,20 +1825,25 @@ function renderDetalleCategoria() {
       const card = document.createElement('div');
       card.className = 'card';
       const extra = !esDistribuidor() ? `<div class="muted">Distribuidor: ${escapeHtml(r['ID DISTRIBUIDOR'])} · ${escapeHtml(r['ID CIUDAD'])}</div>` : '';
+      const accion = puedeConfirmarCartera()
+        ? '<div class="cartera-check"><input type="checkbox"> <span>Confirmar pago visto en banco</span></div>'
+        : '<div class="muted" style="margin-top:8px;">🕓 Pendiente de que Cartera lo confirme</div>';
       card.innerHTML = `
         <div class="row"><strong>Remisión ${escapeHtml(r['REMISION'])}</strong><span class="badge entregado">${escapeHtml(r['FORMA DE PAGO'] || '')}</span></div>
         ${extra}
         <div class="muted">Fecha: ${escapeHtml(formatVal(r['FECHA']))} · Valor: $${formatMoney(r['VLR REMISION'])}</div>
-        <div class="cartera-check"><input type="checkbox"> <span>Confirmar pago visto en banco</span></div>
+        ${accion}
       `;
-      const chk = card.querySelector('input');
-      chk.addEventListener('change', async () => {
-        try {
-          await apiCall('confirmarPagoElectronico', { row: r.__row, confirmado: chk.checked });
-          toast('Confirmado');
-          loadPendientes();
-        } catch (e) { toast('Error: ' + e.message); chk.checked = false; }
-      });
+      if (puedeConfirmarCartera()) {
+        const chk = card.querySelector('input');
+        chk.addEventListener('change', async () => {
+          try {
+            await apiCall('confirmarPagoElectronico', { row: r.__row, confirmado: chk.checked });
+            toast('Confirmado');
+            loadPendientes();
+          } catch (e) { toast('Error: ' + e.message); chk.checked = false; }
+        });
+      }
       cont.appendChild(card);
       return;
     }
