@@ -345,6 +345,9 @@
         <label>Comprobante (foto) *</label>
         <div class="file-drop" id="consFotoDrop">📷 Toca para tomar/adjuntar foto</div>
         <input type="file" id="consFotoInput" accept="image/*" capture="environment" style="display:none;">
+        <label>Comprobante adicional (opcional)</label>
+        <div class="file-drop" id="consFoto2Drop">📷 Toca para tomar/adjuntar una segunda foto, si hace falta</div>
+        <input type="file" id="consFoto2Input" accept="image/*" capture="environment" style="display:none;">
         <label>Observaciones</label>
         <textarea id="consObs" placeholder="Notas adicionales..."></textarea>
         <button class="primary" id="btnEnviarConsignacion">Enviar consignación</button>
@@ -502,7 +505,7 @@ const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyduVPZukNIDZwbbknE
 // el CACHE_VERSION de sw.js. Así, si alguien dice "no veo el cambio",
 // le preguntas qué versión le sale arriba y sabes al instante si su
 // navegador tiene código viejo cacheado o si el problema es otro.
-const APP_VERSION = 'v30';
+const APP_VERSION = 'v31';
 document.addEventListener('DOMContentLoaded', () => {
   const lv = document.getElementById('loginVersion');
   if (lv) lv.textContent = APP_VERSION;
@@ -535,6 +538,7 @@ let autoTimer = null;
 let selectedRemision = null;
 let modalFotoBase64 = null;
 let consFotoBase64 = null;
+let consFotoBase64_2 = null;
 let pendConsignacionesCache = [];
 let productHeadersCache = [];
 
@@ -1308,6 +1312,8 @@ function renderRemisionCard(r) {
     <div class="muted">Fecha: ${escapeHtml(formatVal(r['FECHA']))}</div>
     <div class="muted">Valor: $${formatMoney(r['VLR REMISION'])}</div>
     ${estado ? '<div class="muted">Pago: ' + escapeHtml(r['FORMA DE PAGO'] || '-') + ' · Desplaz: $' + formatMoney(r['VLR DESPLAZAMIENTO'] || r['VALOR DESPLAZAMIENTO']) + '</div>' : ''}
+    ${r['OBSERVACIONES'] ? '<div class="muted">Obs: ' + escapeHtml(r['OBSERVACIONES']) + '</div>' : ''}
+    ${r['COMPROBANTE'] ? '<a href="' + r['COMPROBANTE'] + '" target="_blank" rel="noopener" onclick="event.stopPropagation()"><img src="' + r['COMPROBANTE'] + '" style="max-width:120px;border-radius:8px;margin-top:6px;display:block;" alt="Comprobante"></a>' : ''}
     <div class="actions-row"></div>
   `;
   const actionsRow = card.querySelector('.actions-row');
@@ -1545,6 +1551,9 @@ function renderConsignacionCard(c, opciones) {
   const fotoHtml = c['FOTO']
     ? `<a href="${c['FOTO']}" target="_blank" rel="noopener"><img src="${c['FOTO']}" style="max-width:100%;border-radius:10px;margin-top:8px;display:block;" alt="Comprobante"></a>`
     : '<div class="muted" style="margin-top:8px;">⚠️ Sin foto de comprobante</div>';
+  const foto2Html = c['FOTO 2']
+    ? `<a href="${c['FOTO 2']}" target="_blank" rel="noopener"><img src="${c['FOTO 2']}" style="max-width:100%;border-radius:10px;margin-top:6px;display:block;" alt="Comprobante adicional"></a>`
+    : '';
 
   const valorEsperado = Number(c['VALOR A CONSIGNAR']) || 0;
   const valorReal = Number(c['VALOR CONSIGNADO']) || 0;
@@ -1558,6 +1567,7 @@ function renderConsignacionCard(c, opciones) {
     <div class="muted">A consignar: $${formatMoney(valorEsperado)} · Consignado: <strong style="color:${noCuadra ? 'var(--danger)' : 'var(--text)'}">$${formatMoney(valorReal)}</strong>${noCuadra ? ' ⚠️ no cuadra' : ''}</div>
     ${c['OBSERVACIONES'] ? '<div class="muted">Nota del distribuidor: ' + escapeHtml(c['OBSERVACIONES']) + '</div>' : ''}
     ${fotoHtml}
+    ${foto2Html}
   `;
 
   if (puedeConfirmarCartera()) {
@@ -1604,6 +1614,13 @@ document.getElementById('consFotoInput').addEventListener('change', async (e) =>
   consFotoBase64 = await fileToBase64(file);
   document.getElementById('consFotoDrop').innerHTML = `✅ Foto lista <img src="${consFotoBase64}">`;
 });
+document.getElementById('consFoto2Drop').addEventListener('click', () => document.getElementById('consFoto2Input').click());
+document.getElementById('consFoto2Input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  consFotoBase64_2 = await fileToBase64(file);
+  document.getElementById('consFoto2Drop').innerHTML = `✅ Foto lista <img src="${consFotoBase64_2}">`;
+});
 
 // Formatea el campo de valor consignado como moneda colombiana mientras
 // se escribe ($ 1.234.567), guardando el número real por separado.
@@ -1633,7 +1650,7 @@ document.getElementById('btnEnviarConsignacion').addEventListener('click', async
   try {
     await apiCall('addConsignacion', {
       distribuidorId: session.id, nombre: session.nombre, ciudad: session.ciudad, fechas: fechas,
-      valorConsignado: valor, fotoBase64: consFotoBase64,
+      valorConsignado: valor, fotoBase64: consFotoBase64, fotoBase64_2: consFotoBase64_2,
       remisiones: checks.map(c => c.dataset.remision), remisionRows: checks.map(c => Number(c.value)),
       observaciones: document.getElementById('consObs').value
     });
@@ -1643,7 +1660,9 @@ document.getElementById('btnEnviarConsignacion').addEventListener('click', async
     document.getElementById('consValor').value = '';
     document.getElementById('consObs').value = '';
     consFotoBase64 = null;
+    consFotoBase64_2 = null;
     document.getElementById('consFotoDrop').innerHTML = '📷 Toca para tomar/adjuntar foto';
+    document.getElementById('consFoto2Drop').innerHTML = '📷 Toca para tomar/adjuntar una segunda foto, si hace falta';
     loadConsignarView();
   } catch (e) { toast('Error: ' + e.message); }
   finally { btn.innerHTML = 'Enviar consignación'; }
