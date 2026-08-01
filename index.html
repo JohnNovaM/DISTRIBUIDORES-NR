@@ -505,7 +505,7 @@ const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyduVPZukNIDZwbbknE
 // el CACHE_VERSION de sw.js. Así, si alguien dice "no veo el cambio",
 // le preguntas qué versión le sale arriba y sabes al instante si su
 // navegador tiene código viejo cacheado o si el problema es otro.
-const APP_VERSION = 'v31';
+const APP_VERSION = 'v32';
 document.addEventListener('DOMContentLoaded', () => {
   const lv = document.getElementById('loginVersion');
   if (lv) lv.textContent = APP_VERSION;
@@ -1403,6 +1403,21 @@ document.querySelectorAll('.chip-select .chip').forEach(chip => {
   chip.addEventListener('click', () => {
     document.querySelectorAll('.chip-select .chip').forEach(c => c.classList.remove('active'));
     chip.classList.add('active');
+
+    // Caído/Reprogramado no son formas de pago reales, pero como ya
+    // existen como opción en ese campo, las autocompletamos para que
+    // no se les olvide marcarlas — así queda coherente el reporte.
+    const formaPagoSel = document.getElementById('modalFormaPago');
+    const estado = chip.dataset.estado;
+    if (estado === 'Caído') {
+      formaPagoSel.value = 'CAIDA';
+    } else if (estado === 'Reprogramado') {
+      formaPagoSel.value = 'REPROGRAMADA';
+    } else if (formaPagoSel.value === 'CAIDA' || formaPagoSel.value === 'REPROGRAMADA') {
+      // Si venía de Caído/Reprogramado y ahora eligen Entregado, se
+      // limpia para que tengan que elegir la forma de pago real.
+      formaPagoSel.value = '';
+    }
   });
 });
 document.getElementById('modalFotoDrop').addEventListener('click', () => document.getElementById('modalFotoInput').click());
