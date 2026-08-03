@@ -333,6 +333,7 @@
       <div id="consignarFormWrap">
         <div class="section-title">Reportar consignación</div>
         <label>Remisiones que incluye esta consignación *</label>
+        <input type="text" id="buscadorConsignar" placeholder="🔍 Buscar por número de remisión...">
         <div class="checklist" id="checklistRemisiones"></div>
         <div class="total-box" id="valorAConsignarBox" style="display:none;">
           <span>Valor a consignar (según lo marcado)</span>
@@ -505,7 +506,7 @@ const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyduVPZukNIDZwbbknE
 // el CACHE_VERSION de sw.js. Así, si alguien dice "no veo el cambio",
 // le preguntas qué versión le sale arriba y sabes al instante si su
 // navegador tiene código viejo cacheado o si el problema es otro.
-const APP_VERSION = 'v32';
+const APP_VERSION = 'v33';
 document.addEventListener('DOMContentLoaded', () => {
   const lv = document.getElementById('loginVersion');
   if (lv) lv.textContent = APP_VERSION;
@@ -1305,6 +1306,7 @@ function renderRemisionCard(r) {
   let extra = '<div class="muted">Ciudad: ' + escapeHtml(r['ID CIUDAD']) + '</div>';
   if (!esDistribuidor()) {
     extra += '<div class="muted">Cliente: ' + escapeHtml(r['NOMBRE']) + '</div>';
+    extra += '<div class="muted">Asesor: ' + escapeHtml(r['ASESOR']) + '</div>';
   }
   card.innerHTML = `
     <div class="row"><strong>Remisión ${escapeHtml(r['REMISION'])}</strong><span class="badge ${badgeClass}">${estado || 'Pendiente'}</span></div>
@@ -1499,30 +1501,40 @@ async function loadConsignarView() {
   if (puedeCrearConsignacion()) {
     const res = await apiCall('getPendientes', { distribuidorId: session.id, nombre: session.nombre, ciudad: session.ciudad, verTodas: !!session.verTodas, filtroDistribuidorId: session.filtroDistId, filtroDistribuidorNombre: session.filtroDistNombre });
     pendConsignacionesCache = res.consignacionesPendientes;
-    const cont = document.getElementById('checklistRemisiones');
-
-    // Antes de reconstruir, guardamos qué filas estaban marcadas —
-    // así el auto-refresh no borra la selección a medio camino.
-    const marcadasAntes = new Set(Array.from(cont.querySelectorAll('input:checked')).map(el => el.value));
-
-    cont.innerHTML = '';
-    if (!pendConsignacionesCache.length) {
-      cont.innerHTML = '<div class="empty-state">No hay remisiones entregadas pendientes de consignar</div>';
-    } else {
-      pendConsignacionesCache.forEach(r => {
-        const lab = document.createElement('label');
-        lab.innerHTML = `<input type="checkbox" value="${r.__row}" data-remision="${escapeHtml(r['REMISION'])}" data-valor="${Number(r['VLR REMISION']) || 0}">
-          Remisión ${escapeHtml(r['REMISION'])} — $${formatMoney(r['VLR REMISION'])}`;
-        const chk = lab.querySelector('input');
-        if (marcadasAntes.has(String(r.__row))) chk.checked = true;
-        chk.addEventListener('change', actualizarValorAConsignar);
-        cont.appendChild(lab);
-      });
-    }
-    actualizarValorAConsignar();
+    renderChecklistConsignar();
   }
   await loadConsignacionesHistorial();
 }
+
+function renderChecklistConsignar() {
+  const cont = document.getElementById('checklistRemisiones');
+  const busqueda = document.getElementById('buscadorConsignar').value.trim().toLowerCase();
+
+  // Antes de reconstruir, guardamos qué filas estaban marcadas — así
+  // el auto-refresh (o el buscador) no borra la selección a medio camino.
+  const marcadasAntes = new Set(Array.from(cont.querySelectorAll('input:checked')).map(el => el.value));
+
+  const filtradas = busqueda
+    ? pendConsignacionesCache.filter(r => String(r['REMISION'] || '').toLowerCase().includes(busqueda))
+    : pendConsignacionesCache;
+
+  cont.innerHTML = '';
+  if (!filtradas.length) {
+    cont.innerHTML = `<div class="empty-state">${busqueda ? 'Ninguna remisión pendiente coincide con la búsqueda' : 'No hay remisiones entregadas pendientes de consignar'}</div>`;
+  } else {
+    filtradas.forEach(r => {
+      const lab = document.createElement('label');
+      lab.innerHTML = `<input type="checkbox" value="${r.__row}" data-remision="${escapeHtml(r['REMISION'])}" data-valor="${Number(r['VLR REMISION']) || 0}">
+        Remisión ${escapeHtml(r['REMISION'])} — $${formatMoney(r['VLR REMISION'])}`;
+      const chk = lab.querySelector('input');
+      if (marcadasAntes.has(String(r.__row))) chk.checked = true;
+      chk.addEventListener('change', actualizarValorAConsignar);
+      cont.appendChild(lab);
+    });
+  }
+  actualizarValorAConsignar();
+}
+document.getElementById('buscadorConsignar').addEventListener('input', renderChecklistConsignar);
 
 // Suma en vivo el valor de las remisiones marcadas — solo informativo,
 // no reemplaza el campo "Valor consignado" que llena el distribuidor
