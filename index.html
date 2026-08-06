@@ -344,10 +344,10 @@
         <input type="text" inputmode="numeric" id="consValor" placeholder="$ 0">
         <label>Comprobante (foto) *</label>
         <div class="file-drop" id="consFotoDrop">📷 Toca para tomar/adjuntar foto</div>
-        <input type="file" id="consFotoInput" accept="image/*" capture="environment" style="display:none;">
+        <input type="file" id="consFotoInput" accept="image/*" style="display:none;">
         <label>Comprobante adicional (opcional)</label>
         <div class="file-drop" id="consFoto2Drop">📷 Toca para tomar/adjuntar una segunda foto, si hace falta</div>
-        <input type="file" id="consFoto2Input" accept="image/*" capture="environment" style="display:none;">
+        <input type="file" id="consFoto2Input" accept="image/*" style="display:none;">
         <label>Observaciones</label>
         <textarea id="consObs" placeholder="Notas adicionales..."></textarea>
         <button class="primary" id="btnEnviarConsignacion">Enviar consignación</button>
@@ -379,6 +379,7 @@
 
     <main id="viewPendientes" class="view" style="display:none;">
       <div class="section-title">Resumen</div>
+      <input type="text" id="buscadorPendientes" placeholder="🔍 Buscar por remisión o distribuidor..." style="display:none;">
       <div class="kpi-grid" id="kpiGrid"></div>
       <div id="pendientesDetalle"></div>
     </main>
@@ -458,7 +459,7 @@
 
     <label>Foto (opcional)</label>
     <div class="file-drop" id="modalFotoDrop">📷 Toca para tomar/adjuntar foto</div>
-    <input type="file" id="modalFotoInput" accept="image/*" capture="environment" style="display:none;">
+    <input type="file" id="modalFotoInput" accept="image/*" style="display:none;">
 
     <button class="primary" id="btnGuardarRemision">Guardar</button>
     <p class="error-msg" id="modalError"></p>
@@ -506,7 +507,7 @@ const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyduVPZukNIDZwbbknE
 // el CACHE_VERSION de sw.js. Así, si alguien dice "no veo el cambio",
 // le preguntas qué versión le sale arriba y sabes al instante si su
 // navegador tiene código viejo cacheado o si el problema es otro.
-const APP_VERSION = 'v34';
+const APP_VERSION = 'v35';
 document.addEventListener('DOMContentLoaded', () => {
   const lv = document.getElementById('loginVersion');
   if (lv) lv.textContent = APP_VERSION;
@@ -1484,7 +1485,7 @@ document.getElementById('btnExportarRemisionesExcel').addEventListener('click', 
       ESTADO: r['ESTADO'], 'FORMA DE PAGO': r['FORMA DE PAGO'],
       'VLR REMISION': r['VLR REMISION'], 'VLR DESPLAZAMIENTO': r['VLR DESPLAZAMIENTO'] || r['VALOR DESPLAZAMIENTO'],
       'VLR CONSIGNADO': r['VLR CONSIGNADO'], 'FECHA CONSIGNACION': formatVal(r['FECHA CONSIGNACION']),
-      'CONFIRMADO CARTERA': r['CONFIRMADO CARTERA'] || ''
+      'CONFIRMADO CARTERA': r['CONFIRMADO CARTERA'] || '', OBSERVACIONES: r['OBSERVACIONES'] || ''
     }));
     const ws = XLSX.utils.json_to_sheet(filas);
     const wb = XLSX.utils.book_new();
@@ -1724,7 +1725,7 @@ document.getElementById('btnExportarExcel').addEventListener('click', async () =
       DISTRIBUIDOR: r['ID DISTRIBUIDOR'], CIUDAD: r['ID CIUDAD'], CLIENTE: r['NOMBRE'],
       ESTADO: r['ESTADO'], 'VLR REMISION': r['VLR REMISION'], 'VLR CONSIGNADO': r['VLR CONSIGNADO'],
       'FECHA CONSIGNACION': formatVal(r['FECHA CONSIGNACION']),
-      'CONFIRMADO CARTERA': r['CONFIRMADO CARTERA'] || ''
+      'CONFIRMADO CARTERA': r['CONFIRMADO CARTERA'] || '', OBSERVACIONES: r['OBSERVACIONES'] || ''
     }));
     const ws = XLSX.utils.json_to_sheet(filas);
     const wb = XLSX.utils.book_new();
@@ -1812,6 +1813,7 @@ const CATEGORIAS_PENDIENTES = [
 async function loadPendientes() {
   const res = await apiCall('getPendientes', { distribuidorId: session.id, nombre: session.nombre, ciudad: session.ciudad, verTodas: !!session.verTodas, filtroDistribuidorId: session.filtroDistId, filtroDistribuidorNombre: session.filtroDistNombre });
   pendientesDataCache = res;
+  document.getElementById('buscadorPendientes').style.display = rolUpper() === 'ADMINISTRADOR' ? 'block' : 'none';
 
   const grid = document.getElementById('kpiGrid');
   grid.innerHTML = '';
@@ -1845,6 +1847,8 @@ async function loadPendientes() {
   updateTabBadgeGenerico('viewPendientes', totalBadge);
 }
 
+document.getElementById('buscadorPendientes').addEventListener('input', renderDetalleCategoria);
+
 // Vuelve a pintar solo el grid (para refrescar el estado "activo" de la
 // tarjeta tocada) sin repetir la llamada al servidor.
 function renderPendientesDashboard() {
@@ -1865,13 +1869,28 @@ function renderDetalleCategoria() {
   if (!categoriaAbierta || !pendientesDataCache) return;
 
   const cat = CATEGORIAS_PENDIENTES.find(c => c.key === categoriaAbierta);
-  const lista = pendientesDataCache[categoriaAbierta] || [];
+  let lista = pendientesDataCache[categoriaAbierta] || [];
+
+  if (rolUpper() === 'ADMINISTRADOR') {
+    const busqueda = document.getElementById('buscadorPendientes').value.trim().toLowerCase();
+    if (busqueda) {
+      lista = lista.filter(r =>
+        String(r['REMISION'] || '').toLowerCase().includes(busqueda) ||
+        String(r['ID DISTRIBUIDOR'] || '').toLowerCase().includes(busqueda) ||
+        String(r['REMISIONES QUE CONSIGNA'] || '').toLowerCase().includes(busqueda));
+    }
+  }
 
   const header = document.createElement('div');
   header.className = 'detalle-header';
   header.innerHTML = `<h3>${cat.icon} ${cat.label} (${lista.length})</h3><button>Cerrar ✕</button>`;
   header.querySelector('button').addEventListener('click', () => { categoriaAbierta = null; renderPendientesDashboard(); });
   cont.appendChild(header);
+
+  if (!lista.length) {
+    cont.innerHTML += '<div class="empty-state">Ninguna coincidencia</div>';
+    return;
+  }
 
   lista.forEach(r => {
     if (cat.key === 'pendientesConfirmacionCartera') {
